@@ -25,6 +25,7 @@ import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.core.platform.launch.contentIntent
 import fr.deuspheara.oree.feature.home.presentation.component.AppContextMenu
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import fr.deuspheara.oree.feature.profiles.presentation.route.PhotoGalleryPanel
 import fr.deuspheara.oree.feature.profiles.presentation.screen.ProfilePanel
@@ -150,15 +151,20 @@ class MenuFollowupTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    resume,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = resume,
+                    reduceMotion = true,
                     contentEntries = entries,
-                    onOpenContent = { opened++ },
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenContent -> {
+                                val it = action.entry
+                                opened++
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -264,14 +270,15 @@ class MenuFollowupTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     contentEntries = entries,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }

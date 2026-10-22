@@ -33,6 +33,8 @@ import androidx.compose.ui.test.top
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
+import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -47,7 +49,20 @@ class HomeFocusTest {
     private fun show(items: State<List<TvApp>>, resume: State<Int> = mutableStateOf(0), open: (TvApp) -> Unit = {}) {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(items.value, false), resume.value, true, open, {}, {}, {})
+                HomeScreen(
+                    state = HomeUiState(items.value, false),
+                    resume = resume.value,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                open(action.app)
+                            }
+
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.waitForIdle()
@@ -59,7 +74,17 @@ class HomeFocusTest {
         val resume = mutableStateOf(0)
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(apps, false), resume.value, true, {}, {}, {}, {}, favorites = favorites.value)
+                HomeScreen(
+                    state = HomeUiState(apps, false),
+                    resume = resume.value,
+                    reduceMotion = true,
+                    favorites = favorites.value,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.onNodeWithTag("app:Alpha").assertIsFocused()
@@ -82,14 +107,19 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
-                    onSelected = { selections += it?.id },
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.SelectArtwork -> {
+                                val it = action.app
+                                selections += it?.id
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -116,14 +146,19 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(items.value, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
-                    onSelected = { it?.let { app -> delivered += app.label } },
+                    state = HomeUiState(items.value, false),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.SelectArtwork -> {
+                                val it = action.app
+                                it?.let { app -> delivered += app.label }
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -154,15 +189,16 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Alpha"),
                     hideCards = hidden,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -257,7 +293,16 @@ class HomeFocusTest {
         val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
         restoration.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(apps, false), 0, true, {}, {}, {}, {})
+                HomeScreen(
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.waitForIdle()
@@ -295,14 +340,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = false,
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -326,14 +372,20 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    false,
-                    { opened += it.id },
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = false,
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                val it = action.app
+                                opened += it.id
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -360,14 +412,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = false,
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -391,14 +444,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = false,
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -415,14 +469,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = favorites.value,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -454,16 +509,25 @@ class HomeFocusTest {
             androidx.compose.runtime.SideEffect { hostView = view }
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    { opened++ },
-                    {},
-                    {},
-                    {},
-                    onAppMenu = { app, _, _ ->
-                        menu = app.id
-                        menus++
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
+                    controls = setOf(HomeControl.APP_MENU),
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                val it = action.app
+                                opened++
+                            }
+
+                            is HomeAction.OpenAppMenu -> {
+                                val app = action.app
+                                menu = app.id
+                                menus++
+                            }
+
+                            else -> Unit
+                        }
                     },
                 )
             }
@@ -520,14 +584,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Bravo"),
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -545,7 +610,16 @@ class HomeFocusTest {
         val catalog = (1..40).map { TvApp("App$it", "fixture", "App$it", 0) }
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(catalog, loading.value), 0, true, {}, {}, {}, {})
+                HomeScreen(
+                    state = HomeUiState(catalog, loading.value),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.onNodeWithTag("home-ready").assertDoesNotExist()
@@ -563,15 +637,19 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Bravo"),
-                    onAppMenu = { _, _, _ -> },
+                    controls = setOf(HomeControl.APP_MENU),
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenAppMenu -> {
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -598,7 +676,16 @@ class HomeFocusTest {
         val failed = mutableStateOf(false)
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(apps, false, failed.value), 0, true, {}, {}, {}, {})
+                HomeScreen(
+                    state = HomeUiState(apps, false, failed.value),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.waitForIdle()
@@ -617,14 +704,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(catalog, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = catalog.take(8).map { it.id },
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -645,14 +733,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(catalog, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Card1"),
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -701,15 +790,16 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(catalog, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = false,
                     favorites = listOf("Card1"),
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -754,15 +844,16 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(catalog, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = false,
                     favorites = listOf("Card1"),
                     systemReduceMotion = false,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -785,16 +876,17 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    false,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = false,
                     systemReduceMotion = false,
                     retainDock = true,
                     sourceKey = "fixture",
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -824,16 +916,17 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(catalog, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Card1"),
                     retainDock = true,
                     sourceKey = "fixture",
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -865,7 +958,16 @@ class HomeFocusTest {
         val catalog = (1..40).map { TvApp("Card$it", "fixture", "Card$it", 0) }
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
-                HomeScreen(HomeUiState(catalog, false), 0, true, {}, {}, {}, {})
+                HomeScreen(
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         val raised = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
@@ -889,14 +991,15 @@ class HomeFocusTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = listOf("Alpha"),
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }

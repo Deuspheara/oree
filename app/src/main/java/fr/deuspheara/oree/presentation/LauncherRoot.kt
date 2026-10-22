@@ -54,7 +54,6 @@ import fr.deuspheara.oree.core.designsystem.theme.LauncherTheme
 import fr.deuspheara.oree.core.domain.concurrency.PreferenceSaveStatus
 import fr.deuspheara.oree.core.model.AppOrganization
 import fr.deuspheara.oree.core.model.ArtworkKind
-import fr.deuspheara.oree.core.model.BackupReview
 import fr.deuspheara.oree.core.model.ContentAvailability
 import fr.deuspheara.oree.core.model.ContentEntry
 import fr.deuspheara.oree.core.model.ContentSourceId
@@ -84,9 +83,12 @@ import fr.deuspheara.oree.feature.home.presentation.component.FolderDestinationP
 import fr.deuspheara.oree.feature.home.presentation.component.FolderPanel
 import fr.deuspheara.oree.feature.home.presentation.component.FolderRenamePanel
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
+import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeViewModel
+import fr.deuspheara.oree.feature.home.presentation.viewmodel.OrganizationWriteStatus
 import fr.deuspheara.oree.feature.profiles.presentation.route.PhotoGalleryPanel
-import fr.deuspheara.oree.feature.profiles.presentation.screen.ProfilePanel
+import fr.deuspheara.oree.feature.profiles.presentation.route.ProfilesRoute
 import fr.deuspheara.oree.feature.profiles.presentation.screen.WallpaperPanel
 import fr.deuspheara.oree.feature.profiles.presentation.viewmodel.ProfilesViewModel
 import fr.deuspheara.oree.feature.search.domain.SearchAction
@@ -96,14 +98,22 @@ import fr.deuspheara.oree.feature.search.presentation.viewmodel.SearchRequest
 import fr.deuspheara.oree.feature.search.presentation.viewmodel.SearchViewModel
 import fr.deuspheara.oree.feature.settings.presentation.component.BackupReviewPanel
 import fr.deuspheara.oree.feature.settings.presentation.component.CommandPanel
+import fr.deuspheara.oree.feature.settings.presentation.route.AmbientRoute
 import fr.deuspheara.oree.feature.settings.presentation.route.ContentCapabilitiesPanel
-import fr.deuspheara.oree.feature.settings.presentation.screen.AmbientScreen
 import fr.deuspheara.oree.feature.settings.presentation.screen.SettingsScreen
+import fr.deuspheara.oree.feature.settings.presentation.state.AmbientSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.BackupSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.ContentSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsAction
 import fr.deuspheara.oree.feature.settings.presentation.state.SettingsCategory
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsControl
+import fr.deuspheara.oree.feature.settings.presentation.viewmodel.BackupStatus
+import fr.deuspheara.oree.feature.settings.presentation.viewmodel.RestoreStatus
 import fr.deuspheara.oree.feature.settings.presentation.viewmodel.SettingsViewModel
 import fr.deuspheara.oree.navigation.LauncherNavigation
 import fr.deuspheara.oree.platform.contract.CreateLocalBackup
 import fr.deuspheara.oree.platform.contract.OpenLocalBackup
+import fr.deuspheara.oree.presentation.WallpaperImportStatus
 import fr.deuspheara.oree.service.resolveDreamSettings
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -153,13 +163,20 @@ fun LauncherRoot(
     var profilesOpen by navigation.profilesOpen
     var wallpaperOpen by navigation.wallpaperOpen
     var photoGalleryOpen by navigation.photoGalleryOpen
-    var profileCommandSaving by remember { mutableStateOf(false) }
-    var profileCommandFailed by remember { mutableStateOf(false) }
+    var profileEffectFailed by remember(profile?.id) { mutableStateOf(false) }
+    val organizationWrite by home.writing.collectAsStateWithLifecycle()
+    val launcherWrite by launcher.writing.collectAsStateWithLifecycle()
     val importProgress by launcher.importing.collectAsStateWithLifecycle()
-    val profileSaving = profileCommandSaving || importProgress?.saving == true
-    val profileFailed = profileCommandFailed || importProgress?.failed == true
+    val profileSaving =
+        organizationWrite?.status == OrganizationWriteStatus.SAVING || launcherWrite?.status == LauncherWriteStatus.SAVING ||
+            importProgress?.status == WallpaperImportStatus.SAVING
+    val profileFailed =
+        profileEffectFailed ||
+            organizationWrite?.takeIf { it.profileId == profile?.id }?.status == OrganizationWriteStatus.FAILED ||
+            launcherWrite?.takeIf { it.profileId == profile?.id }?.status == LauncherWriteStatus.FAILED ||
+            importProgress?.takeIf { it.profileId == profile?.id }?.status == WallpaperImportStatus.FAILED
     LaunchedEffect(importProgress) {
-        if (importProgress?.completed == true) {
+        if (importProgress?.status == WallpaperImportStatus.COMPLETED) {
             if (importProgress?.profileId == profile?.id) photoGalleryOpen = false
             launcher.clearImportResult()
         }
@@ -212,8 +229,8 @@ fun LauncherRoot(
         menuCaptureJob?.cancel()
         menuCapturePending = false
     }
-    var organizationSaving by remember { mutableStateOf(false) }
-    var organizationWriteFailed by remember { mutableStateOf(false) }
+    val organizationSaving = organizationWrite?.status == OrganizationWriteStatus.SAVING
+    val organizationWriteFailed = organizationWrite?.takeIf { it.profileId == profile?.id }?.status == OrganizationWriteStatus.FAILED
     var favoriteMove by remember(profile?.id) { mutableStateOf<FavoriteMove?>(null) }
     var openFolder by navigation.openFolder
     var renameFolder by navigation.renameFolder
@@ -225,9 +242,10 @@ fun LauncherRoot(
     var moveReturnToSearch by remember(profile?.id) { mutableStateOf(false) }
     var settingsCategory by navigation.settingsCategory
     var diagnosticsOpen by rememberSaveable { mutableStateOf(false) }
-    var backupBusy by remember { mutableStateOf(false) }
-    var backupFailed by remember { mutableStateOf(false) }
-    var backupReview by remember { mutableStateOf<BackupReview?>(null) }
+    val backupState by settingsViewModel.backup.collectAsStateWithLifecycle()
+    val backupBusy = backupState.busy
+    val backupFailed = backupState.status == BackupStatus.FAILED
+    val backupReview = backupState.review
     var ambientOpen by remember(profile?.id) { mutableStateOf(false) }
     var photoPreview by remember(profile?.id) { mutableStateOf<LocalPhoto?>(null) }
     val scope = rememberCoroutineScope()
@@ -245,7 +263,7 @@ fun LauncherRoot(
     var settingsOpen by navigation.settingsOpen
     var customizeControls by remember { mutableStateOf(false) }
     fun savePreferences(value: LauncherPreferences) {
-        if (settingsViewModel.restoring.value?.saving != true) {
+        if (settingsViewModel.restoring.value?.status != RestoreStatus.SAVING) {
             profile?.id?.let { settingsViewModel.setPreferences(it, value) }
         }
     }
@@ -258,8 +276,10 @@ fun LauncherRoot(
     LaunchedEffect(resume) { systemActions.resumed() }
     var importProfileId by rememberSaveable { mutableStateOf<String?>(null) }
     fun importPhoto(uri: android.net.Uri, id: String?) {
-        if (id != null && !profileSaving && settingsViewModel.restoring.value?.saving != true) {
-            profileCommandFailed = false
+        if (id != null && !profileSaving && settingsViewModel.restoring.value?.status != RestoreStatus.SAVING) {
+            profileEffectFailed = false
+            launcher.acknowledgeWrite()
+            home.acknowledgeWrite()
             launcher.importPhoto(id, uri.toString())
         }
     }
@@ -270,68 +290,35 @@ fun LauncherRoot(
             if (uri != null) importPhoto(uri, id)
         }
     fun changeProfile(action: suspend () -> Unit) {
-        if (!profileSaving && settingsViewModel.restoring.value?.saving != true) {
+        if (!profileSaving && settingsViewModel.restoring.value?.status != RestoreStatus.SAVING) {
             scope.launch {
-                profileCommandSaving = true
-                profileCommandFailed = false
+                profileEffectFailed = false
+                launcher.acknowledgeWrite()
+                home.acknowledgeWrite()
                 try {
                     action()
                 } catch (_: IOException) {
-                    profileCommandFailed = true
                     Toast.makeText(context, R.string.preferences_write_error, Toast.LENGTH_LONG)
                         .show()
-                } finally {
-                    profileCommandSaving = false
+                } catch (_: SecurityException) {
+                    Toast.makeText(context, R.string.preferences_write_error, Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
     val uninstall = remember(context) { AppUninstall(context.applicationContext) }
-    suspend fun awaitPreferenceWrites() {
-        settingsViewModel.flushPreferences()
+    val exportBackup = rememberLauncherForActivityResult(CreateLocalBackup()) { uri ->
+        uri?.let { settingsViewModel.export(it.toString()) }
     }
-    val exportBackup =
-        rememberLauncherForActivityResult(CreateLocalBackup()) { uri ->
-            if (uri != null) {
-                scope.launch {
-                    backupBusy = true
-                    backupFailed = false
-                    try {
-                        awaitPreferenceWrites()
-                        settingsViewModel.export(uri.toString())
-                        Toast.makeText(context, R.string.backup_exported, Toast.LENGTH_LONG).show()
-                    } catch (_: IOException) {
-                        backupFailed = true
-                    } catch (_: SecurityException) {
-                        backupFailed = true
-                    } finally {
-                        backupBusy = false
-                    }
-                }
-            }
+    val importBackup = rememberLauncherForActivityResult(OpenLocalBackup()) { uri ->
+        uri?.let { settingsViewModel.review(it.toString()) }
+    }
+    LaunchedEffect(backupState.status) {
+        if (backupState.status == BackupStatus.EXPORTED) {
+            Toast.makeText(context, R.string.backup_exported, Toast.LENGTH_LONG).show()
+            settingsViewModel.acknowledgeBackupResult()
         }
-    val importBackup =
-        rememberLauncherForActivityResult(OpenLocalBackup()) { uri ->
-            if (uri != null) {
-                scope.launch {
-                    backupBusy = true
-                    backupFailed = false
-                    try {
-                        val candidate = settingsViewModel.read(uri.toString())
-                        awaitPreferenceWrites()
-                        val expected =
-                            launcher.readSnapshot() ?: throw IOException("Profiles unavailable")
-                        backupReview = BackupReview(candidate, expected)
-                    } catch (_: IOException) {
-                        backupFailed = true
-                    } catch (_: SecurityException) {
-                        backupFailed = true
-                    } finally {
-                        backupBusy = false
-                    }
-                }
-            }
-        }
+    }
     val uninstallResult =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             home.reload()
@@ -401,9 +388,9 @@ fun LauncherRoot(
     }
     LaunchedEffect(restoreProgress, profiles) {
         val progress = restoreProgress
-        if (progress?.completed == true && profiles == progress.review.candidate.snapshot) {
-            backupReview = null
-            backupFailed = false
+        if (progress?.status == RestoreStatus.COMPLETED && profiles == progress.review.candidate.snapshot) {
+            settingsViewModel.dismissBackupReview()
+            settingsViewModel.acknowledgeBackupResult()
             searchOpen = false
             searchQuery = ""
             openFolder = null
@@ -437,7 +424,7 @@ fun LauncherRoot(
                 if (event == Lifecycle.Event.ON_STOP) {
                     ambientOpen = false
                     photoPreview = null
-                    if (!organizationSaving) {
+                    if (home.writing.value?.status != OrganizationWriteStatus.SAVING) {
                         favoriteMove = null
                         folderMoveApp = null
                     }
@@ -467,7 +454,7 @@ fun LauncherRoot(
         ) {
             return
         }
-        organizationWriteFailed = false
+        home.acknowledgeWrite()
         menuCapturePending = true
         menuCaptureJob = scope.launch {
             try {
@@ -541,108 +528,135 @@ fun LauncherRoot(
                     holder.SaveableStateProvider("home:${profile?.id}") {
                         HomeScreen(
                             appPreviewsEnabled = profile?.appPreviewsEnabled == true,
-                            onSearch = { searchOpen = true },
                             folders = profile?.folders.orEmpty(),
-                            onFolder = {
-                                openFolder = it
-                                profileCommandFailed = false
-                            },
                             movingFavorite = favoriteMove?.appId,
                             moveSaving = organizationSaving,
                             moveFailed = organizationWriteFailed,
-                            onMoveFavorite = { direction ->
-                                favoriteMove = favoriteMove?.let { move ->
-                                    move.copy(
-                                        draft =
-                                            moveFavoriteApp(
-                                                move.draft,
-                                                move.appId,
-                                                direction,
-                                                state.apps.mapTo(hashSetOf()) { it.id },
-                                            ),
-                                    )
-                                }
-                            },
-                            onCancelMove = {
-                                favoriteMove = null
-                                organizationWriteFailed = false
-                                if (moveReturnToSearch) {
-                                    searchOpen = true
-                                    moveReturnToSearch = false
-                                }
-                                restoreEpoch++
-                            },
-                            onCommitMove = {
-                                favoriteMove?.let { move ->
-                                    if (!organizationSaving) {
-                                        organizationSaving = true
-                                        organizationWriteFailed = false
-                                        scope.launch {
-                                            try {
-                                                home.reorderFavorites(
-                                                    move.profileId,
-                                                    move.original,
-                                                    move.draft,
-                                                )
-                                                favoriteMove = null
-                                                if (moveReturnToSearch) {
-                                                    searchOpen = true
-                                                    moveReturnToSearch = false
-                                                }
-                                                restoreEpoch++
-                                            } catch (_: IOException) {
-                                                organizationWriteFailed = true
-                                            } finally {
-                                                organizationSaving = false
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            retainDock =
-                                frame != null &&
-                                    profile?.wallpaper in
-                                    listOf(WallpaperMode.LANDSCAPE, WallpaperMode.PERSONAL),
+                            retainDock = frame != null &&
+                                profile?.wallpaper in
+                                listOf(WallpaperMode.LANDSCAPE, WallpaperMode.PERSONAL),
                             sourceKey = frame,
                             hideCards = controlsEditing || ambientOpen,
                             contentEntries = visibleContent,
-                            onOpenContent = ::openContent,
-                            state =
-                                if (stored == null || organization == null) {
-                                    state.copy(loading = true)
-                                } else {
-                                    state
-                                },
+                            state = if (stored == null || organization == null) {
+                                state.copy(loading = true)
+                            } else {
+                                state
+                            },
                             resume = resume + restoreEpoch,
                             reduceMotion = active.reduceMotion,
-                            onOpen = onOpen,
-                            onSettings = {
-                                settingsCategory = SettingsCategory.APPEARANCE
-                                settingsOpen = true
-                                cacheBytes = loader.memoryCache?.size ?: 0L
-                            },
-                            onReduceMotion = {
-                                savePreferences(active.copy(reduceMotion = !active.reduceMotion))
-                            },
-                            onRetry = home::reload,
-                            showContext = active.showContext,
                             economy = active.quality == QualityTier.ECONOMY,
-                            onCommands = {
-                                customizeControls = false
-                                commands = true
-                            },
                             systemReduceMotion = systemReduced,
                             favorites = favoriteMove?.draft ?: organization?.favorites.orEmpty(),
                             profile = profile,
-                            onProfiles = {
-                                profilesOpen = true
-                                profileCommandFailed = false
+                            controls = setOf(HomeControl.SEARCH, HomeControl.COMMANDS, HomeControl.PROFILES, HomeControl.APP_MENU),
+                            onAction = { action ->
+                                when (action) {
+                                    is HomeAction.OpenApp -> {
+                                        onOpen(action.app)
+                                    }
+
+                                    HomeAction.OpenSettings -> {
+                                        settingsCategory = SettingsCategory.APPEARANCE
+                                        settingsOpen = true
+                                        cacheBytes = loader.memoryCache?.size ?: 0L
+                                    }
+
+                                    HomeAction.Retry -> {
+                                        home.reload()
+                                    }
+
+                                    HomeAction.OpenCommands -> {
+                                        customizeControls = false
+                                        commands = true
+                                    }
+
+                                    HomeAction.OpenProfiles -> {
+                                        profilesOpen = true
+                                        profileEffectFailed = false
+                                        launcher.acknowledgeWrite()
+                                        home.acknowledgeWrite()
+                                    }
+
+                                    is HomeAction.SelectArtwork -> {
+                                        val it = action.app
+                                        focusedApp = it
+                                        launcher.selectArtwork(it)
+                                    }
+
+                                    is HomeAction.OpenContent -> {
+                                        openContent(action.entry)
+                                    }
+
+                                    is HomeAction.MoveFavorite -> {
+                                        val direction = action.direction
+                                        favoriteMove = favoriteMove?.let { move ->
+                                            move.copy(
+                                                draft =
+                                                    moveFavoriteApp(
+                                                        move.draft,
+                                                        move.appId,
+                                                        direction,
+                                                        state.apps.mapTo(hashSetOf()) { it.id },
+                                                    ),
+                                            )
+                                        }
+                                    }
+
+                                    HomeAction.CommitMove -> {
+                                        favoriteMove?.let { move ->
+                                            if (!organizationSaving) {
+                                                home.acknowledgeWrite()
+                                                scope.launch {
+                                                    try {
+                                                        home.reorderFavorites(
+                                                            move.profileId,
+                                                            move.original,
+                                                            move.draft,
+                                                        )
+                                                        favoriteMove = null
+                                                        if (moveReturnToSearch) {
+                                                            searchOpen = true
+                                                            moveReturnToSearch = false
+                                                        }
+                                                        restoreEpoch++
+                                                    } catch (_: IOException) {
+                                                        // Failure remains observable in HomeViewModel across route recreation.
+                                                    } catch (_: SecurityException) {
+                                                        // Permission failures use the same retained operation state.
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HomeAction.CancelMove -> {
+                                        favoriteMove = null
+                                        home.acknowledgeWrite()
+                                        if (moveReturnToSearch) {
+                                            searchOpen = true
+                                            moveReturnToSearch = false
+                                        }
+                                        restoreEpoch++
+                                    }
+
+                                    is HomeAction.OpenFolder -> {
+                                        val it = action.id
+                                        openFolder = it
+                                        profileEffectFailed = false
+                                        launcher.acknowledgeWrite()
+                                        home.acknowledgeWrite()
+                                    }
+
+                                    HomeAction.OpenSearch -> {
+                                        searchOpen = true
+                                    }
+
+                                    is HomeAction.OpenAppMenu -> {
+                                        showAppMenu(action.app, action.anchor, action.awaitingRelease)
+                                    }
+                                }
                             },
-                            onSelected = {
-                                focusedApp = it
-                                launcher.selectArtwork(it)
-                            },
-                            onAppMenu = ::showAppMenu,
                         )
                     }
                 } else {
@@ -661,31 +675,202 @@ fun LauncherRoot(
                             }
                         SettingsScreen(
                             versionName = BuildConfig.VERSION_NAME,
-                            onAmbient = { ambientOpen = true },
-                            ambientVisible = ambientOpen,
-                            ambientPhotos = profile?.ambientPhotos == true,
-                            ambientClock = profile?.ambientClock != false,
-                            onAmbientPhotos = {
-                                profile?.id?.let { id ->
-                                    changeProfile {
-                                        launcher.setAmbientPhotos(
-                                            id,
-                                            profile?.ambientPhotos != true,
-                                        )
+                            initialCategory = settingsCategory,
+                            inputs = tvInputs,
+                            value = active,
+                            cacheBytes = cacheBytes,
+                            writeFailed = preferenceState?.status == PreferenceSaveStatus.FAILED,
+                            reduceMotion = active.reduceMotion ||
+                                systemReduced ||
+                                active.quality == QualityTier.ECONOMY,
+                            content = ContentSettingsState(
+                                watchNextEnabled = profile?.watchNextEnabled == true,
+                                watchNextAvailability = if (watchNextDenied) {
+                                    ContentAvailability.DENIED
+                                } else if (profile?.watchNextEnabled == true) {
+                                    feed.sources[ContentSourceId.WATCH_NEXT] ?: feed.availability
+                                } else {
+                                    ContentAvailability.DISABLED
+                                },
+                                appPreviewsEnabled = profile?.appPreviewsEnabled == true,
+                                appPreviewAvailability = if (previewDenied) {
+                                    ContentAvailability.DENIED
+                                } else if (profile?.appPreviewsEnabled == true) {
+                                    feed.sources[ContentSourceId.PREVIEW] ?: feed.availability
+                                } else {
+                                    ContentAvailability.DISABLED
+                                },
+                            ),
+                            backup = BackupSettingsState(
+                                busy = backupBusy || restoreProgress?.status == RestoreStatus.SAVING,
+                                failed = backupFailed,
+                            ),
+                            ambient = AmbientSettingsState(
+                                visible = ambientOpen,
+                                photos = profile?.ambientPhotos == true,
+                                clock = profile?.ambientClock != false,
+                            ),
+                            controls = setOfNotNull(
+                                SettingsControl.AMBIENT,
+                                SettingsControl.AMBIENT_PHOTOS,
+                                SettingsControl.AMBIENT_CLOCK,
+                                SettingsControl.DREAM_SETTINGS.takeIf { dreamSettings != null },
+                                SettingsControl.EXPORT,
+                                SettingsControl.IMPORT,
+                                SettingsControl.UNDO.takeIf { canUndoRestore },
+                                SettingsControl.APP_PREVIEWS,
+                                SettingsControl.DIAGNOSTICS,
+                                SettingsControl.WALLPAPER,
+                                SettingsControl.PROFILES,
+                            ),
+                            onAction = { action ->
+                                when (action) {
+                                    SettingsAction.Close -> {
+                                        closeSettings()
                                     }
-                                }
-                            },
-                            onAmbientClock = {
-                                profile?.id?.let { id ->
-                                    changeProfile {
-                                        launcher.setAmbientClock(id, profile?.ambientClock != true)
+
+                                    SettingsAction.AndroidSettings -> {
+                                        onAndroidSettings()
                                     }
-                                }
-                            },
-                            onDreamSettings =
-                                if (dreamSettings != null) {
-                                    (
-                                        {
+
+                                    SettingsAction.ClearCache -> {
+                                        loader.memoryCache?.clear()
+                                        cacheBytes = loader.memoryCache?.size ?: 0L
+                                    }
+
+                                    SettingsAction.RetrySave -> {
+                                        profile?.id?.let(settingsViewModel::retryPreferences)
+                                    }
+
+                                    SettingsAction.CustomizeControls -> {
+                                        customizeControls = true
+                                        commands = true
+                                    }
+
+                                    SettingsAction.Wallpaper -> {
+                                        wallpaperOpen = true
+                                        profileEffectFailed = false
+                                        launcher.acknowledgeWrite()
+                                        home.acknowledgeWrite()
+                                    }
+
+                                    SettingsAction.Profiles -> {
+                                        profilesOpen = true
+                                        profileEffectFailed = false
+                                        launcher.acknowledgeWrite()
+                                        home.acknowledgeWrite()
+                                    }
+
+                                    SettingsAction.ToggleWatchNext -> {
+                                        profile?.let { p ->
+                                            watchNextDenied = false
+                                            if (
+                                                p.watchNextEnabled ||
+                                                context.checkSelfPermission(
+                                                    "android.permission.READ_TV_LISTINGS",
+                                                ) ==
+                                                android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                changeProfile {
+                                                    launcher.setWatchNextEnabled(p.id, !p.watchNextEnabled)
+                                                }
+                                            } else {
+                                                watchNextPermissionProfile = p.id
+                                                watchNextPermission.launch(
+                                                    "android.permission.READ_TV_LISTINGS",
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    SettingsAction.RetryContent -> {
+                                        launcher.retryContent()
+                                    }
+
+                                    SettingsAction.Diagnostics -> {
+                                        diagnosticsOpen = true
+                                    }
+
+                                    SettingsAction.ToggleAppPreviews -> {
+                                        profile?.let { p ->
+                                            previewDenied = false
+                                            if (
+                                                p.appPreviewsEnabled ||
+                                                context.checkSelfPermission(
+                                                    "android.permission.READ_TV_LISTINGS",
+                                                ) ==
+                                                android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                changeProfile {
+                                                    launcher.setAppPreviewsEnabled(
+                                                        p.id,
+                                                        !p.appPreviewsEnabled,
+                                                    )
+                                                }
+                                            } else {
+                                                previewPermissionProfile = p.id
+                                                previewPermission.launch(
+                                                    "android.permission.READ_TV_LISTINGS",
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    SettingsAction.ExportBackup -> {
+                                        try {
+                                            exportBackup.launch("tv-launcher-backup.json")
+                                        } catch (_: android.content.ActivityNotFoundException) {
+                                            settingsViewModel.reportBackupFailure()
+                                        } catch (_: SecurityException) {
+                                            settingsViewModel.reportBackupFailure()
+                                        }
+                                    }
+
+                                    SettingsAction.ImportBackup -> {
+                                        try {
+                                            importBackup.launch(
+                                                arrayOf(
+                                                    "application/json",
+                                                    "application/octet-stream",
+                                                    "text/plain",
+                                                ),
+                                            )
+                                        } catch (_: android.content.ActivityNotFoundException) {
+                                            settingsViewModel.reportBackupFailure()
+                                        } catch (_: SecurityException) {
+                                            settingsViewModel.reportBackupFailure()
+                                        }
+                                    }
+
+                                    SettingsAction.UndoRestore -> {
+                                        if (canUndoRestore) settingsViewModel.reviewPrevious()
+                                    }
+
+                                    SettingsAction.OpenAmbient -> {
+                                        ambientOpen = true
+                                    }
+
+                                    SettingsAction.ToggleAmbientPhotos -> {
+                                        profile?.id?.let { id ->
+                                            changeProfile {
+                                                launcher.setAmbientPhotos(
+                                                    id,
+                                                    profile?.ambientPhotos != true,
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    SettingsAction.ToggleAmbientClock -> {
+                                        profile?.id?.let { id ->
+                                            changeProfile {
+                                                launcher.setAmbientClock(id, profile?.ambientClock != true)
+                                            }
+                                        }
+                                    }
+
+                                    SettingsAction.DreamSettings -> {
+                                        if (dreamSettings != null) {
                                             scope.launch {
                                                 val request = resolveDreamSettings(context)
                                                 if (
@@ -701,170 +886,29 @@ fun LauncherRoot(
                                                 }
                                             }
                                         }
-                                        )
-                                } else {
-                                    null
-                                },
-                            backupBusy = backupBusy || restoreProgress?.saving == true,
-                            backupFailed = backupFailed,
-                            onExport = {
-                                try {
-                                    exportBackup.launch("tv-launcher-backup.json")
-                                } catch (_: android.content.ActivityNotFoundException) {
-                                    backupFailed = true
-                                } catch (_: SecurityException) {
-                                    backupFailed = true
-                                }
-                            },
-                            onImport = {
-                                try {
-                                    importBackup.launch(
-                                        arrayOf(
-                                            "application/json",
-                                            "application/octet-stream",
-                                            "text/plain",
-                                        ),
-                                    )
-                                } catch (_: android.content.ActivityNotFoundException) {
-                                    backupFailed = true
-                                } catch (_: SecurityException) {
-                                    backupFailed = true
-                                }
-                            },
-                            onUndoRestore =
-                                if (canUndoRestore) {
-                                    (
-                                        {
-                                            scope.launch {
-                                                backupBusy = true
-                                                backupFailed = false
-                                                try {
-                                                    val candidate = settingsViewModel.previous()
-                                                    awaitPreferenceWrites()
-                                                    val expected =
-                                                        launcher.readSnapshot()
-                                                            ?: throw IOException("Profiles unavailable")
-                                                    backupReview =
-                                                        BackupReview(candidate, expected, true)
-                                                } catch (_: IOException) {
-                                                    backupFailed = true
-                                                } finally {
-                                                    backupBusy = false
-                                                }
+                                    }
+
+                                    is SettingsAction.ChangePreferences -> {
+                                        savePreferences(action.value)
+                                    }
+
+                                    is SettingsAction.OpenInput -> {
+                                        val input = action.input
+                                        scope.launch {
+                                            if (
+                                                !launcher.tvInputs.contains(input.id) ||
+                                                systemActions.input(input) != true
+                                            ) {
+                                                Toast.makeText(
+                                                    context,
+                                                    R.string.input_open_error,
+                                                    Toast.LENGTH_LONG,
+                                                )
+                                                    .show()
                                             }
                                         }
-                                        )
-                                } else {
-                                    null
-                                },
-                            appPreviewsEnabled = profile?.appPreviewsEnabled == true,
-                            appPreviewAvailability =
-                                if (previewDenied) {
-                                    ContentAvailability.DENIED
-                                } else if (profile?.appPreviewsEnabled == true) {
-                                    feed.sources[ContentSourceId.PREVIEW] ?: feed.availability
-                                } else {
-                                    ContentAvailability.DISABLED
-                                },
-                            onAppPreviews = {
-                                profile?.let { p ->
-                                    previewDenied = false
-                                    if (
-                                        p.appPreviewsEnabled ||
-                                        context.checkSelfPermission(
-                                            "android.permission.READ_TV_LISTINGS",
-                                        ) ==
-                                        android.content.pm.PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        changeProfile {
-                                            launcher.setAppPreviewsEnabled(
-                                                p.id,
-                                                !p.appPreviewsEnabled,
-                                            )
-                                        }
-                                    } else {
-                                        previewPermissionProfile = p.id
-                                        previewPermission.launch(
-                                            "android.permission.READ_TV_LISTINGS",
-                                        )
                                     }
                                 }
-                            },
-                            onDiagnostics = { diagnosticsOpen = true },
-                            initialCategory = settingsCategory,
-                            onRetryContent = { launcher.retryContent() },
-                            watchNextEnabled = profile?.watchNextEnabled == true,
-                            contentAvailability =
-                                if (watchNextDenied) {
-                                    ContentAvailability.DENIED
-                                } else if (profile?.watchNextEnabled == true) {
-                                    feed.sources[ContentSourceId.WATCH_NEXT] ?: feed.availability
-                                } else {
-                                    ContentAvailability.DISABLED
-                                },
-                            onWatchNext = {
-                                profile?.let { p ->
-                                    watchNextDenied = false
-                                    if (
-                                        p.watchNextEnabled ||
-                                        context.checkSelfPermission(
-                                            "android.permission.READ_TV_LISTINGS",
-                                        ) ==
-                                        android.content.pm.PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        changeProfile {
-                                            launcher.setWatchNextEnabled(p.id, !p.watchNextEnabled)
-                                        }
-                                    } else {
-                                        watchNextPermissionProfile = p.id
-                                        watchNextPermission.launch(
-                                            "android.permission.READ_TV_LISTINGS",
-                                        )
-                                    }
-                                }
-                            },
-                            inputs = tvInputs,
-                            onInput = { input ->
-                                scope.launch {
-                                    if (
-                                        !launcher.tvInputs.contains(input.id) ||
-                                        systemActions.input(input) != true
-                                    ) {
-                                        Toast.makeText(
-                                            context,
-                                            R.string.input_open_error,
-                                            Toast.LENGTH_LONG,
-                                        )
-                                            .show()
-                                    }
-                                }
-                            },
-                            value = active,
-                            onChange = ::savePreferences,
-                            onClose = ::closeSettings,
-                            onRetrySave = { profile?.id?.let(settingsViewModel::retryPreferences) },
-                            onCustomizeControls = {
-                                customizeControls = true
-                                commands = true
-                            },
-                            onAndroidSettings = onAndroidSettings,
-                            cacheBytes = cacheBytes,
-                            onClearCache = {
-                                loader.memoryCache?.clear()
-                                cacheBytes = loader.memoryCache?.size ?: 0L
-                            },
-                            writeFailed = preferenceState?.status == PreferenceSaveStatus.FAILED,
-                            reduceMotion =
-                                active.reduceMotion ||
-                                    systemReduced ||
-                                    active.quality == QualityTier.ECONOMY,
-                            onWallpaper = {
-                                wallpaperOpen = true
-                                profileCommandFailed = false
-                            },
-                            onProfiles = {
-                                profilesOpen = true
-                                profileCommandFailed = false
                             },
                         )
                     }
@@ -949,7 +993,9 @@ fun LauncherRoot(
 
                                     is SearchItem.Folder -> {
                                         openFolder = item.folder.id
-                                        profileCommandFailed = false
+                                        profileEffectFailed = false
+                                        launcher.acknowledgeWrite()
+                                        home.acknowledgeWrite()
                                     }
 
                                     is SearchItem.Content -> openContent(item.entry)
@@ -973,12 +1019,16 @@ fun LauncherRoot(
                                         when (item.action) {
                                             SearchAction.PROFILES -> {
                                                 profilesOpen = true
-                                                profileCommandFailed = false
+                                                profileEffectFailed = false
+                                                launcher.acknowledgeWrite()
+                                                home.acknowledgeWrite()
                                             }
 
                                             SearchAction.WALLPAPER -> {
                                                 wallpaperOpen = true
-                                                profileCommandFailed = false
+                                                profileEffectFailed = false
+                                                launcher.acknowledgeWrite()
+                                                home.acknowledgeWrite()
                                             }
 
                                             SearchAction.ANDROID_SETTINGS -> onAndroidSettings()
@@ -1043,7 +1093,9 @@ fun LauncherRoot(
                             ::showAppMenu,
                             onRename = {
                                 renameFolder = folder.id
-                                profileCommandFailed = false
+                                profileEffectFailed = false
+                                launcher.acknowledgeWrite()
+                                home.acknowledgeWrite()
                             },
                             onDelete = {
                                 profile?.id?.let { id ->
@@ -1097,7 +1149,9 @@ fun LauncherRoot(
                             },
                             onClose = {
                                 folderDestination = null
-                                profileCommandFailed = false
+                                profileEffectFailed = false
+                                launcher.acknowledgeWrite()
+                                home.acknowledgeWrite()
                                 restoreEpoch++
                             },
                         )
@@ -1122,7 +1176,9 @@ fun LauncherRoot(
                             },
                             onClose = {
                                 renameFolder = null
-                                profileCommandFailed = false
+                                profileEffectFailed = false
+                                launcher.acknowledgeWrite()
+                                home.acknowledgeWrite()
                                 restoreEpoch++
                             },
                         )
@@ -1167,7 +1223,7 @@ fun LauncherRoot(
                                         searchOpen = false
                                     }
                                     appMenu = null
-                                    organizationWriteFailed = false
+                                    home.acknowledgeWrite()
                                     restoreEpoch++
                                 }
                                 )
@@ -1187,7 +1243,9 @@ fun LauncherRoot(
                         onMoveToFolder = {
                             appMenu = null
                             folderDestination = target.app
-                            profileCommandFailed = false
+                            profileEffectFailed = false
+                            launcher.acknowledgeWrite()
+                            home.acknowledgeWrite()
                         },
                         onMoveHome =
                             if (memberFolder != null) {
@@ -1292,7 +1350,6 @@ fun LauncherRoot(
                         },
                         onFavorite = { favorite ->
                             if (!organizationSaving && appMenu != null) {
-                                organizationSaving = true
                                 scope.launch {
                                     try {
                                         profile?.id?.let { id ->
@@ -1300,9 +1357,9 @@ fun LauncherRoot(
                                         }
                                         appMenu = appMenu?.copy(dismissRequested = true)
                                     } catch (_: IOException) {
-                                        organizationWriteFailed = true
-                                    } finally {
-                                        organizationSaving = false
+                                        // Failure remains observable in HomeViewModel across route recreation.
+                                    } catch (_: SecurityException) {
+                                        // Permission failures use the same retained operation state.
                                     }
                                 }
                             }
@@ -1325,28 +1382,29 @@ fun LauncherRoot(
                     )
                 }
                 (backupReview ?: restoreProgress?.review)?.let { review ->
-                    val saving = backupBusy || restoreProgress?.saving == true
+                    val saving = backupBusy || restoreProgress?.status == RestoreStatus.SAVING
                     BackupReviewPanel(
                         review,
                         saving,
-                        backupFailed || restoreProgress?.failed == true,
+                        backupFailed || restoreProgress?.status == RestoreStatus.FAILED,
                         onClose = {
                             if (!saving) {
-                                backupReview = null
-                                backupFailed = false
+                                settingsViewModel.dismissBackupReview()
+                                settingsViewModel.acknowledgeBackupResult()
                                 settingsViewModel.clearRestore()
+                                settingsViewModel.dismissBackupReview()
                             }
                         },
                         onRestore = {
                             if (!saving) {
-                                backupFailed = false
+                                settingsViewModel.acknowledgeBackupResult()
                                 settingsViewModel.restore(review)
                             }
                         },
                     )
                 }
                 if (ambientOpen) {
-                    AmbientScreen(
+                    AmbientRoute(
                         frame,
                         profile?.ambientPhotos == true,
                         profile?.ambientClock != false,
@@ -1361,7 +1419,7 @@ fun LauncherRoot(
                     )
                 }
                 photoPreview?.let { photo ->
-                    AmbientScreen(
+                    AmbientRoute(
                         frame,
                         false,
                         false,
@@ -1416,7 +1474,9 @@ fun LauncherRoot(
                         onWallpaper = {
                             commands = false
                             wallpaperOpen = true
-                            profileCommandFailed = false
+                            profileEffectFailed = false
+                            launcher.acknowledgeWrite()
+                            home.acknowledgeWrite()
                         },
                         onNetwork = {
                             commands = false
@@ -1442,29 +1502,18 @@ fun LauncherRoot(
                 if (profilesOpen && profiles != null) {
                     val profilesModel: ProfilesViewModel =
                         org.koin.compose.viewmodel.koinViewModel()
-                    val profileState by profilesModel.state.collectAsStateWithLifecycle()
-                    LaunchedEffect(profileState.completed) {
-                        if (profileState.completed) {
+                    ProfilesRoute(
+                        model = profilesModel,
+                        snapshot = profiles!!,
+                        reduced = active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                        opaque = active.reduceTransparency || active.highContrast,
+                        onCompleted = {
                             settingsOpen = false
                             profilesOpen = false
                             restoreEpoch++
-                            profilesModel.acknowledge()
-                        }
-                    }
-                    ProfilePanel(
-                        profiles!!,
-                        active.reduceMotion ||
-                            systemReduced ||
-                            active.quality == QualityTier.ECONOMY,
-                        active.reduceTransparency || active.highContrast,
-                        profileState.saving,
-                        profileState.failed,
-                        onSelect = profilesModel::select,
-                        onSave = profilesModel::save,
-                        onDelete = profilesModel::delete,
+                        },
                         onClose = {
                             profilesOpen = false
-                            profilesModel.acknowledge()
                             restoreEpoch++
                         },
                         sourceKey = frame,
@@ -1487,12 +1536,14 @@ fun LauncherRoot(
                                 imagePicker.launch("image/*")
                             } catch (_: android.content.ActivityNotFoundException) {
                                 importProfileId = null
-                                profileCommandFailed = true
+                                profileEffectFailed = true
                             }
                         },
                         onClose = {
                             photoGalleryOpen = false
-                            profileCommandFailed = false
+                            profileEffectFailed = false
+                            launcher.acknowledgeWrite()
+                            home.acknowledgeWrite()
                             launcher.clearImportResult()
                         },
                     )
@@ -1516,7 +1567,9 @@ fun LauncherRoot(
                         },
                         onImport = {
                             photoGalleryOpen = true
-                            profileCommandFailed = false
+                            profileEffectFailed = false
+                            launcher.acknowledgeWrite()
+                            home.acknowledgeWrite()
                         },
                         onContent = {
                             if (

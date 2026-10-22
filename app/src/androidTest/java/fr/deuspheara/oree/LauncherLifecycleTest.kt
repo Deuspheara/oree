@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
+import fr.deuspheara.oree.core.designsystem.R
 import org.junit.Rule
 import org.junit.Test
 
@@ -49,7 +50,8 @@ class LauncherLifecycleTest {
         }
         activate("search")
         awaitTag("search-query")
-        compose.onNodeWithTag("search-query").performTextInput("home")
+        val query = compose.activity.getString(R.string.home_settings)
+        compose.onNodeWithTag("search-query").performTextInput(query)
         compose.waitUntil(5_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("search-result:action:HOME"))
                 .fetchSemanticsNodes().isNotEmpty()
@@ -70,7 +72,7 @@ class LauncherLifecycleTest {
         back()
         awaitGone("launcher-settings")
         awaitTag("search-query")
-        compose.onNodeWithTag("search-query").assertTextContains("home")
+        compose.onNodeWithTag("search-query").assertTextContains(query)
         back()
         compose.waitUntil(5_000) {
             androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)

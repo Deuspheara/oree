@@ -27,6 +27,6 @@ fun SearchRoute(
     val state by model.state.collectAsStateWithLifecycle()
     SearchPanel(
         request.query, onQuery, resume, reduced, onSelect, onAppMenu, onClose,
-        state.takeIf { it.ready }?.results, onSystemSearch,
+        state.takeIf { it.request == request }?.results, onSystemSearch,
     )
 }

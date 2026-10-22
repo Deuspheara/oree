@@ -21,6 +21,19 @@ Cover every content-source toggle combination, preview-only zero Watch Next read
 
 A delayed shared observer must not make export read stale preferences after a successful flush. Successful committed-read retry must recover a failed observation without a stop/start cycle. Accepted wallpaper import and its progress must survive route recreation and retain the captured profile ID.
 
+## Presentation refactor regression coverage
+
+`FeatureOperationStateTest` checks accepted-write serialization after waiter cancellation,
+retained write failure/retry, duplicate profile commands, restore flush barriers and blocked edits,
+committed-snapshot backup review with a delayed observation, and cancellation of obsolete catalog
+reads while preserving cached content. `LauncherStateTest` covers retained wallpaper import,
+profile-write failure after route cancellation and bounded initialization retries.
+
+`SearchViewModelTest` checks subscription ownership, latest-request ranking and identifiable
+replay. `RegisteredFocusTest` checks late requester registration, the one-second missing-target
+bound and cancellation using virtual time. These tests do not establish native focus correctness
+or remote-to-photon latency. Keep existing D-pad/modal/recreation instrumentation for that work.
+
 ## Direct Android instrumentation
 
 Use a disposable TV emulator where possible. On a configured TV, preserve a private data backup and replace-install only this package. Connected-test tooling may uninstall targets; do not use it on configured user data.

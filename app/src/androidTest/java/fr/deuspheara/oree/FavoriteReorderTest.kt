@@ -20,6 +20,7 @@ import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.core.model.moveFavoriteApp
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import java.io.File
 import java.io.IOException
@@ -51,27 +52,36 @@ class FavoriteReorderTest {
                 var draft by remember { mutableStateOf(stored) }
                 var moving by remember { mutableStateOf<String?>(apps.first().id) }
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    { opens++ },
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = draft,
                     movingFavorite = moving,
-                    onMoveFavorite = {
-                        draft =
-                            moveFavoriteApp(
-                                draft,
-                                moving!!,
-                                it,
-                                apps.mapTo(hashSetOf()) { app -> app.id },
-                            )
-                    },
-                    onCommitMove = {
-                        stored = draft
-                        moving = null
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                val it = action.app
+                                opens++
+                            }
+
+                            is HomeAction.MoveFavorite -> {
+                                val it = action.direction
+                                draft =
+                                    moveFavoriteApp(
+                                        draft,
+                                        moving!!,
+                                        it,
+                                        apps.mapTo(hashSetOf()) { app -> app.id },
+                                    )
+                            }
+
+                            HomeAction.CommitMove -> {
+                                stored = draft
+                                moving = null
+                            }
+
+                            else -> Unit
+                        }
                     },
                 )
             }
@@ -104,20 +114,29 @@ class FavoriteReorderTest {
                 var draft by remember { mutableStateOf(original) }
                 var moving by remember { mutableStateOf<String?>("A") }
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = draft,
                     movingFavorite = moving,
-                    onMoveFavorite = { draft = moveFavoriteApp(draft, "A", it, original.toSet()) },
-                    onCommitMove = { committed = true },
-                    onCancelMove = {
-                        draft = original
-                        moving = null
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.MoveFavorite -> {
+                                val it = action.direction
+                                draft = moveFavoriteApp(draft, "A", it, original.toSet())
+                            }
+
+                            HomeAction.CommitMove -> {
+                                committed = true
+                            }
+
+                            HomeAction.CancelMove -> {
+                                draft = original
+                                moving = null
+                            }
+
+                            else -> Unit
+                        }
                     },
                 )
             }

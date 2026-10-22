@@ -94,16 +94,17 @@ class AppPreviewsTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(apps, false),
-                    0,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(apps, false),
+                    resume = 0,
+                    reduceMotion = true,
                     favorites = apps.take(2).map { it.id },
                     contentEntries = entries,
                     appPreviewsEnabled = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }

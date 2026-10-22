@@ -17,6 +17,7 @@ import fr.deuspheara.oree.core.designsystem.glass.LocalOpaquePanels
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.ThemeMode
 import fr.deuspheara.oree.feature.settings.presentation.screen.SettingsScreen
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsAction
 import org.junit.Rule
 import org.junit.Test
 
@@ -47,7 +48,21 @@ class SettingsVisualTest {
             ) {
                 HazeTestTheme(value) {
                     CompositionLocalProvider(LocalOpaquePanels provides true) {
-                        SettingsScreen(value, { value = it }, {}, {}, 0, {}, reduceMotion = true)
+                        SettingsScreen(
+                            value = value,
+                            cacheBytes = 0,
+                            reduceMotion = true,
+                            onAction = { action ->
+                                when (action) {
+                                    is SettingsAction.ChangePreferences -> {
+                                        val it = action.value
+                                        value = it
+                                    }
+
+                                    else -> Unit
+                                }
+                            },
+                        )
                     }
                 }
             }

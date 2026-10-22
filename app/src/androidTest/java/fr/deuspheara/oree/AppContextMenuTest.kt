@@ -24,6 +24,8 @@ import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.feature.home.presentation.component.AppContextMenu
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
+import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -73,17 +75,29 @@ class AppContextMenuTest {
             var resume by remember { mutableIntStateOf(0) }
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
-                    HomeUiState(
+                    state = HomeUiState(
                         listOf(TvApp("Alpha", "Alpha", "Alpha", 0)),
                         false,
                     ),
-                    resume,
-                    true,
-                    { opened++ },
-                    {},
-                    {},
-                    {},
-                    onAppMenu = { app, bounds, _ -> target = app to bounds },
+                    resume = resume,
+                    reduceMotion = true,
+                    controls = setOf(HomeControl.APP_MENU),
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                val it = action.app
+                                opened++
+                            }
+
+                            is HomeAction.OpenAppMenu -> {
+                                val app = action.app
+                                val bounds = action.anchor
+                                target = app to bounds
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
                 target?.let { (app, bounds) ->
                     AppContextMenu(

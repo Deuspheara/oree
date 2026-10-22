@@ -50,14 +50,15 @@ class InputSelectionMenuTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 SettingsScreen(
-                    LauncherPreferences(),
-                    {},
-                    {},
-                    {},
-                    0,
-                    {},
+                    value = LauncherPreferences(),
+                    cacheBytes = 0,
                     inputs = TvInputs(entries),
                     reduceMotion = true,
+                    onAction = { action ->
+                        when (action) {
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }

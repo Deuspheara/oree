@@ -27,7 +27,7 @@ data class SearchRequest(
     val photos: List<LocalPhoto>,
 )
 
-data class SearchUiState(val results: List<SearchItem> = emptyList(), val ready: Boolean = false)
+data class SearchUiState(val results: List<SearchItem> = emptyList(), val request: SearchRequest? = null)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SearchViewModel(private val dispatchers: AppDispatchers) : ViewModel() {
@@ -47,7 +47,7 @@ class SearchViewModel(private val dispatchers: AppDispatchers) : ViewModel() {
                             input.favorites,
                             input.photos,
                         ),
-                        ready = true,
+                        request = input,
                     )
                 }
             }

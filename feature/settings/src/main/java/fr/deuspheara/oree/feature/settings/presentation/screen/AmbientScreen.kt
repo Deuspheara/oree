@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -60,33 +59,23 @@ import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.model.LocalPhotos
 import fr.deuspheara.oree.core.model.PhotoAvailability
 import fr.deuspheara.oree.core.platform.image.WallpaperFrame
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 
 /** Manually opened foreground view. No idle detection, standby override or keep-awake flag. */
 @Composable
 fun AmbientScreen(
     frame: WallpaperFrame?,
+    photos: LocalPhotos,
     photosEnabled: Boolean,
     showClock: Boolean,
     reduced: Boolean,
-    loadPhotos: suspend () -> LocalPhotos,
     onClose: () -> Unit,
     photo: Uri? = null,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val photos by
-        produceState(LocalPhotos(PhotoAvailability.EMPTY), photosEnabled, lifecycle) {
-            if (photosEnabled) {
-                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    value = loadPhotos().let { it.copy(photos = it.photos.take(20)) }
-                    awaitCancellation()
-                }
-            }
-        }
     var index by remember { mutableIntStateOf(0) }
     LaunchedEffect(photos.photos, lifecycle) {
-        if (photosEnabled && photos.photos.size > 1) {
+        if (photos.photos.size > 1) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
                     delay(30_000)

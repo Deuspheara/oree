@@ -48,68 +48,48 @@ import fr.deuspheara.oree.core.designsystem.component.LauncherSymbol
 import fr.deuspheara.oree.core.designsystem.component.SettingsRow
 import fr.deuspheara.oree.core.designsystem.component.panelMotion
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
-import fr.deuspheara.oree.core.designsystem.resource.contentStatus
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens as D
 import fr.deuspheara.oree.core.designsystem.theme.MotionTokens
-import fr.deuspheara.oree.core.model.ContentAvailability
 import fr.deuspheara.oree.core.model.LauncherPreferences
-import fr.deuspheara.oree.core.model.QualityTier
-import fr.deuspheara.oree.core.model.ThemeMode
 import fr.deuspheara.oree.core.model.TvInput
 import fr.deuspheara.oree.core.model.TvInputs
-import fr.deuspheara.oree.feature.settings.presentation.component.AccentSelector
-import fr.deuspheara.oree.feature.settings.presentation.component.GlassIntensityPreview
 import fr.deuspheara.oree.feature.settings.presentation.component.InputSelectionMenu
+import fr.deuspheara.oree.feature.settings.presentation.state.AmbientSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.BackupSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.ContentSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsAction
 import fr.deuspheara.oree.feature.settings.presentation.state.SettingsCategory
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsControl
 
 @Composable
 fun SettingsScreen(
     value: LauncherPreferences,
-    onChange: (LauncherPreferences) -> Unit,
-    onClose: () -> Unit,
-    onAndroidSettings: () -> Unit,
+    onAction: (SettingsAction) -> Unit,
     cacheBytes: Long,
-    onClearCache: () -> Unit,
-    onRetrySave: () -> Unit = {},
-    onCustomizeControls: () -> Unit = {},
     writeFailed: Boolean = false,
     reduceMotion: Boolean = false,
     dismissRequested: Boolean = false,
-    onWallpaper: (() -> Unit)? = null,
-    onProfiles: (() -> Unit)? = null,
-    watchNextEnabled: Boolean = false,
-    contentAvailability: ContentAvailability = ContentAvailability.DISABLED,
-    onWatchNext: () -> Unit = {},
-    onRetryContent: () -> Unit = {},
     inputs: TvInputs = TvInputs(),
-    onInput: (TvInput) -> Unit = {},
     initialCategory: SettingsCategory = SettingsCategory.APPEARANCE,
-    onDiagnostics: (() -> Unit)? = null,
-    appPreviewsEnabled: Boolean = false,
-    onAppPreviews: (() -> Unit)? = null,
-    appPreviewAvailability: ContentAvailability = ContentAvailability.DISABLED,
-    onExport: (() -> Unit)? = null,
-    onImport: (() -> Unit)? = null,
-    onUndoRestore: (() -> Unit)? = null,
-    backupBusy: Boolean = false,
-    backupFailed: Boolean = false,
-    onAmbient: (() -> Unit)? = null,
-    ambientVisible: Boolean = false,
-    ambientPhotos: Boolean = false,
-    ambientClock: Boolean = true,
-    onAmbientPhotos: (() -> Unit)? = null,
-    onAmbientClock: (() -> Unit)? = null,
-    onDreamSettings: (() -> Unit)? = null,
     versionName: String = "",
+    content: ContentSettingsState = ContentSettingsState(),
+    backup: BackupSettingsState = BackupSettingsState(),
+    ambient: AmbientSettingsState = AmbientSettingsState(),
+    controls: Set<SettingsControl> = emptySet(),
 ) {
+    val onClose = { onAction(SettingsAction.Close) }
+    val onAndroidSettings = { onAction(SettingsAction.AndroidSettings) }
+    val onRetrySave = { onAction(SettingsAction.RetrySave) }
+    val onChange = { value: LauncherPreferences -> onAction(SettingsAction.ChangePreferences(value)) }
+    val onInput = { input: TvInput -> onAction(SettingsAction.OpenInput(input)) }
     var inputsOpen by rememberSaveable { mutableStateOf(false) }
     var restoreInputs by remember { mutableStateOf(false) }
     val inputTrigger = remember { FocusRequester() }
     val windowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
     val ambientTrigger = remember { FocusRequester() }
     var restoreAmbient by remember { mutableStateOf(false) }
-    LaunchedEffect(ambientVisible, windowFocused) {
-        if (!ambientVisible && restoreAmbient && windowFocused) {
+    LaunchedEffect(ambient.visible, windowFocused) {
+        if (!ambient.visible && restoreAmbient && windowFocused) {
             withFrameNanos {}
             ambientTrigger.requestFocus()
             restoreAmbient = false
@@ -128,7 +108,8 @@ fun SettingsScreen(
             restoreInputs = true
         }
     }
-    var category by remember(initialCategory) { mutableStateOf(initialCategory) }
+    var category by rememberSaveable(initialCategory) { mutableStateOf(initialCategory) }
+    val entryCategory = remember(initialCategory) { category }
     val first = remember { FocusRequester() }
     var firstPlaced by remember { mutableStateOf(false) }
     val contentScroll = rememberScrollState()
@@ -169,7 +150,7 @@ fun SettingsScreen(
                     Modifier.weight(1f).testTag("settings-categories"),
                     state =
                         androidx.compose.foundation.lazy.rememberLazyListState(
-                            initialFirstVisibleItemIndex = initialCategory.ordinal,
+                            initialFirstVisibleItemIndex = entryCategory.ordinal,
                         ),
                     contentPadding = PaddingValues(vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -180,7 +161,7 @@ fun SettingsScreen(
                             { if (!motion.closing) category = item },
                             Modifier.fillMaxWidth()
                                 .then(
-                                    if (item == initialCategory) {
+                                    if (item == entryCategory) {
                                         Modifier.focusRequester(first).onGloballyPositioned {
                                             firstPlaced = true
                                         }
@@ -221,253 +202,12 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(6.dp))
                 when (category) {
-                    SettingsCategory.APPEARANCE -> {
-                        SettingsChoice(
-                            R.string.theme_label,
-                            themeLabel(value.theme),
-                            "theme",
-                            reduceMotion,
-                        ) {
-                            change(
-                                value.copy(
-                                    theme =
-                                        ThemeMode.entries[
-                                            (value.theme.ordinal + 1) % ThemeMode.entries.size,
-                                        ],
-                                ),
-                            )
-                        }
-                        SettingsChoice(
-                            R.string.quality_label,
-                            if (value.quality == QualityTier.ECONOMY) {
-                                R.string.quality_economy
-                            } else {
-                                R.string.quality_balanced
-                            },
-                            "quality",
-                            reduceMotion,
-                        ) {
-                            change(
-                                value.copy(
-                                    quality =
-                                        if (value.quality == QualityTier.BALANCED) {
-                                            QualityTier.ECONOMY
-                                        } else {
-                                            QualityTier.BALANCED
-                                        },
-                                ),
-                            )
-                        }
-                        Help(R.string.quality_help)
-                        SettingsToggle(
-                            R.string.liquid_glass,
-                            value.liquidGlass,
-                            "liquid-glass",
-                            reduceMotion,
-                        ) {
-                            change(value.copy(liquidGlass = !value.liquidGlass))
-                        }
-                        SettingsRow(
-                            stringResource(R.string.glass_intensity),
-                            {
-                                change(
-                                    value.copy(
-                                        glassIntensity =
-                                            if (value.glassIntensity >= 1f) {
-                                                .25f
-                                            } else {
-                                                value.glassIntensity + .25f
-                                            },
-                                    ),
-                                )
-                            },
-                            Modifier.fillMaxWidth().testTag("settings-glass-intensity"),
-                            value = "${(value.glassIntensity * 100).toInt()}%",
-                            enabled = value.liquidGlass,
-                            reduced = reduceMotion,
-                        )
-                        GlassIntensityPreview(value)
-                        Help(R.string.glass_help)
-                        Text(
-                            stringResource(R.string.accent_color),
-                            color = D.secondary,
-                            fontSize = 15.sp,
-                        )
-                        AccentSelector(value.accent) { change(value.copy(accent = it)) }
-                        onAmbient?.let { action ->
-                            SettingsRow(
-                                stringResource(R.string.ambient_open),
-                                {
-                                    restoreAmbient = true
-                                    action()
-                                },
-                                Modifier.fillMaxWidth()
-                                    .focusRequester(ambientTrigger)
-                                    .testTag("settings-ambient"),
-                            )
-                            onAmbientPhotos?.let {
-                                SettingsRow(
-                                    stringResource(R.string.ambient_photos),
-                                    it,
-                                    Modifier.fillMaxWidth(),
-                                    value =
-                                        stringResource(
-                                            if (ambientPhotos) {
-                                                R.string.enabled
-                                            } else {
-                                                R.string.disabled
-                                            },
-                                        ),
-                                )
-                            }
-                            onAmbientClock?.let {
-                                SettingsRow(
-                                    stringResource(R.string.ambient_clock),
-                                    it,
-                                    Modifier.fillMaxWidth(),
-                                    value =
-                                        stringResource(
-                                            if (ambientClock) {
-                                                R.string.enabled
-                                            } else {
-                                                R.string.disabled
-                                            },
-                                        ),
-                                )
-                            }
-                            onDreamSettings?.let {
-                                SettingsRow(
-                                    stringResource(R.string.ambient_system_settings),
-                                    it,
-                                    Modifier.fillMaxWidth().testTag("settings-dream"),
-                                )
-                            }
-                            Help(R.string.ambient_help)
-                        }
-                        SettingsRow(
-                            stringResource(R.string.defaults),
-                            { change(LauncherPreferences()) },
-                            Modifier.fillMaxWidth().testTag("settings-defaults"),
-                            reduced = reduceMotion,
-                        )
-                    }
+                    SettingsCategory.APPEARANCE -> AppearanceSettings(value, reduceMotion, ambient, ambientTrigger, ::change, { action ->
+                        if (action == SettingsAction.OpenAmbient) restoreAmbient = true
+                        onAction(action)
+                    }, controls)
 
-                    SettingsCategory.HOME -> {
-                        onAppPreviews?.let {
-                            SettingsRow(
-                                stringResource(R.string.app_previews),
-                                it,
-                                Modifier.fillMaxWidth().testTag("settings-app-previews"),
-                                value =
-                                    stringResource(
-                                        if (appPreviewsEnabled) {
-                                            R.string.enabled
-                                        } else {
-                                            R.string.disabled
-                                        },
-                                    ),
-                            )
-                            Text(
-                                stringResource(
-                                    when (appPreviewAvailability) {
-                                        ContentAvailability.LOADING -> R.string.diagnostics_loading
-
-                                        ContentAvailability.AVAILABLE -> R.string.preview_available
-
-                                        ContentAvailability.DENIED -> R.string.diagnostics_denied
-
-                                        ContentAvailability.UNSUPPORTED ->
-                                            R.string.diagnostics_unsupported
-
-                                        ContentAvailability.ERROR -> R.string.diagnostics_error
-
-                                        ContentAvailability.DISABLED -> R.string.disabled
-
-                                        else -> R.string.preview_empty
-                                    },
-                                ),
-                                color = D.secondary,
-                                fontSize = 13.sp,
-                            )
-                            if (appPreviewAvailability == ContentAvailability.ERROR) {
-                                SettingsRow(
-                                    stringResource(R.string.retry),
-                                    onRetryContent,
-                                    Modifier.fillMaxWidth(),
-                                )
-                            }
-                            Help(R.string.app_previews_help)
-                        }
-                        onDiagnostics?.let {
-                            SettingsRow(
-                                stringResource(R.string.content_diagnostics),
-                                it,
-                                Modifier.fillMaxWidth().testTag("settings-content-diagnostics"),
-                                symbol = LauncherSymbol.ABOUT,
-                            )
-                        }
-                        SettingsRow(
-                            stringResource(R.string.watch_next_home),
-                            onWatchNext,
-                            Modifier.fillMaxWidth().testTag("settings-watch-next"),
-                            value =
-                                stringResource(
-                                    if (watchNextEnabled) R.string.enabled else R.string.disabled,
-                                ),
-                        )
-                        Text(
-                            stringResource(
-                                when (contentAvailability) {
-                                    ContentAvailability.AVAILABLE -> R.string.watch_next_available
-                                    ContentAvailability.DISABLED -> R.string.watch_next_disabled
-                                    ContentAvailability.DENIED -> R.string.watch_next_denied
-                                    else -> contentStatus(contentAvailability)
-                                },
-                            ),
-                            color = D.secondary,
-                            fontSize = 13.sp,
-                            modifier = Modifier.testTag("watch-next-status"),
-                        )
-                        if (contentAvailability == ContentAvailability.ERROR) {
-                            SettingsRow(
-                                stringResource(R.string.retry),
-                                onRetryContent,
-                                Modifier.fillMaxWidth().testTag("watch-next-retry"),
-                            )
-                        }
-                        Help(R.string.watch_next_help)
-                        SettingsRow(
-                            stringResource(R.string.inputs),
-                            { inputsOpen = true },
-                            Modifier.fillMaxWidth()
-                                .focusRequester(inputTrigger)
-                                .testTag("settings-inputs"),
-                            symbol = LauncherSymbol.ANDROID,
-                        )
-                        onWallpaper?.let {
-                            SettingsRow(
-                                stringResource(R.string.wallpaper),
-                                it,
-                                Modifier.fillMaxWidth().testTag("settings-wallpaper"),
-                                symbol = LauncherSymbol.WALLPAPER,
-                            )
-                        }
-                        onProfiles?.let {
-                            SettingsRow(
-                                stringResource(R.string.profiles),
-                                it,
-                                Modifier.fillMaxWidth().testTag("settings-profiles"),
-                                symbol = LauncherSymbol.PROFILE,
-                            )
-                        }
-                        SettingsRow(
-                            stringResource(R.string.customize_controls),
-                            onCustomizeControls,
-                            Modifier.fillMaxWidth().testTag("settings-customize-controls"),
-                            symbol = LauncherSymbol.CONTROLS,
-                        )
-                        Help(R.string.home_dock_help)
-                    }
+                    SettingsCategory.HOME -> HomeSettings(content, inputTrigger, { inputsOpen = true }, onAction, controls)
 
                     SettingsCategory.NAVIGATION -> {
                         Help(R.string.navigation_help)
@@ -482,111 +222,15 @@ fun SettingsScreen(
                         Help(R.string.motion_help)
                     }
 
-                    SettingsCategory.ACCESSIBILITY -> {
-                        SettingsToggle(
-                            R.string.contrast_label,
-                            value.highContrast,
-                            "contrast",
-                            reduceMotion,
-                        ) {
-                            change(value.copy(highContrast = !value.highContrast))
-                        }
-                        SettingsToggle(
-                            R.string.transparency_label,
-                            value.reduceTransparency,
-                            "transparency",
-                            reduceMotion,
-                        ) {
-                            change(value.copy(reduceTransparency = !value.reduceTransparency))
-                        }
-                        SettingsToggle(
-                            R.string.reduced_motion,
-                            value.reduceMotion,
-                            "motion",
-                            reduceMotion,
-                        ) {
-                            change(value.copy(reduceMotion = !value.reduceMotion))
-                        }
-                        SettingsRow(
-                            stringResource(R.string.text_size),
-                            {
-                                change(
-                                    value.copy(
-                                        textScale =
-                                            when {
-                                                value.textScale < 1.25f -> 1.25f
-                                                value.textScale < 1.5f -> 1.5f
-                                                value.textScale < 2f -> 2f
-                                                else -> 1f
-                                            },
-                                    ),
-                                )
-                            },
-                            Modifier.fillMaxWidth().testTag("settings-text-size"),
-                            value = "${(value.textScale * 100).toInt()}%",
-                            reduced = reduceMotion,
-                        )
-                    }
+                    SettingsCategory.ACCESSIBILITY -> AccessibilitySettings(value, reduceMotion, ::change)
 
                     SettingsCategory.PRIVACY -> Help(R.string.privacy_body)
 
-                    SettingsCategory.STORAGE -> {
-                        onExport?.let {
-                            SettingsRow(
-                                stringResource(R.string.backup_export),
-                                it,
-                                Modifier.fillMaxWidth().testTag("backup-export"),
-                                enabled = !backupBusy,
-                            )
-                        }
-                        onImport?.let {
-                            SettingsRow(
-                                stringResource(R.string.backup_import),
-                                it,
-                                Modifier.fillMaxWidth().testTag("backup-import"),
-                                enabled = !backupBusy,
-                            )
-                        }
-                        onUndoRestore?.let {
-                            SettingsRow(
-                                stringResource(R.string.backup_undo),
-                                it,
-                                Modifier.fillMaxWidth().testTag("backup-undo"),
-                                enabled = !backupBusy,
-                            )
-                        }
-                        if (onExport != null) Help(R.string.backup_assets_help)
-                        if (backupFailed) {
-                            Text(stringResource(R.string.backup_error), color = D.foreground)
-                        }
-                        Help(R.string.cache_help)
-                        Text(
-                            stringResource(R.string.cache_size, cacheBytes / 1024),
-                            color = D.secondary,
-                        )
-                        SettingsRow(
-                            stringResource(R.string.clear_image_cache),
-                            { if (!motion.closing) onClearCache() },
-                            Modifier.fillMaxWidth().testTag("clear-image-cache"),
-                            symbol = LauncherSymbol.STORAGE,
-                            reduced = reduceMotion,
-                        )
-                    }
+                    SettingsCategory.STORAGE -> StorageSettings(backup, cacheBytes, reduceMotion, { action ->
+                        if (action != SettingsAction.ClearCache || !motion.closing) onAction(action)
+                    }, controls)
 
-                    SettingsCategory.ABOUT -> {
-                        Help(R.string.about_body)
-                        Text(
-                            stringResource(R.string.version_label, versionName),
-                            color = D.secondary,
-                        )
-                        SettingsRow(
-                            stringResource(R.string.system_settings),
-                            { if (!motion.closing) onAndroidSettings() },
-                            Modifier.fillMaxWidth(),
-                            symbol = LauncherSymbol.ANDROID,
-                            reduced = reduceMotion,
-                        )
-                    }
+                    SettingsCategory.ABOUT -> AboutSettings(versionName, reduceMotion, { if (!motion.closing) onAndroidSettings() })
                 }
             }
         }
@@ -615,39 +259,6 @@ private fun categoryTitle(category: SettingsCategory) = when (category) {
     SettingsCategory.PRIVACY -> R.string.privacy
     SettingsCategory.STORAGE -> R.string.storage
     SettingsCategory.ABOUT -> R.string.about
-}
-
-private fun themeLabel(theme: ThemeMode) = when (theme) {
-    ThemeMode.DARK -> R.string.theme_dark
-    ThemeMode.LIGHT -> R.string.theme_light
-    ThemeMode.SYSTEM -> R.string.theme_system
-}
-
-@Composable
-private fun SettingsChoice(title: Int, value: Int, tag: String, reduced: Boolean, onClick: () -> Unit) {
-    SettingsRow(
-        stringResource(title),
-        onClick,
-        Modifier.fillMaxWidth().testTag("settings-$tag"),
-        value = stringResource(value),
-        reduced = reduced,
-    )
-}
-
-@Composable
-private fun SettingsToggle(title: Int, checked: Boolean, tag: String, reduced: Boolean, onClick: () -> Unit) {
-    SettingsChoice(
-        title,
-        if (checked) R.string.enabled else R.string.disabled,
-        tag,
-        reduced,
-        onClick,
-    )
-}
-
-@Composable
-private fun Help(resource: Int) {
-    Text(stringResource(resource), color = D.secondary, fontSize = 15.sp)
 }
 
 private fun categorySymbol(category: SettingsCategory) = when (category) {

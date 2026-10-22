@@ -32,10 +32,12 @@ import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.core.platform.datasource.content.AndroidContentCapabilitySource
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
+import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import fr.deuspheara.oree.feature.settings.presentation.component.BackupReviewPanel
+import fr.deuspheara.oree.feature.settings.presentation.route.AmbientRoute
 import fr.deuspheara.oree.feature.settings.presentation.route.ContentCapabilitiesPanel
-import fr.deuspheara.oree.feature.settings.presentation.screen.AmbientScreen
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -54,20 +56,28 @@ class ExtensionPanelsTest {
                 var ambient by remember { mutableStateOf(false) }
                 var resume by remember { mutableIntStateOf(0) }
                 HomeScreen(
-                    HomeUiState(listOf(app), false),
-                    resume,
-                    true,
-                    {
-                        opened++
-                    },
-                    {},
-                    {},
-                    {},
-                    onCommands = { ambient = true },
+                    state = HomeUiState(listOf(app), false),
+                    resume = resume,
+                    reduceMotion = true,
                     favorites = listOf(app.id),
+                    controls = setOf(HomeControl.COMMANDS),
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenApp -> {
+                                val it = action.app
+                                opened++
+                            }
+
+                            HomeAction.OpenCommands -> {
+                                ambient = true
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
                 if (ambient) {
-                    AmbientScreen(
+                    AmbientRoute(
                         null,
                         false,
                         false,
@@ -117,7 +127,7 @@ class ExtensionPanelsTest {
                 var shown by remember { mutableStateOf(true) }
                 CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                     if (shown) {
-                        AmbientScreen(
+                        AmbientRoute(
                             null,
                             true,
                             false,

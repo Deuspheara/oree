@@ -29,6 +29,7 @@ import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.feature.home.presentation.component.FolderPanel
 import fr.deuspheara.oree.feature.home.presentation.screen.HomeScreen
+import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
 import fr.deuspheara.oree.feature.search.domain.SearchAction
 import fr.deuspheara.oree.feature.search.domain.SearchItem
@@ -66,15 +67,20 @@ class FolderSearchTest {
                 var opened by remember { mutableStateOf(false) }
                 var resume by remember { mutableIntStateOf(0) }
                 HomeScreen(
-                    HomeUiState(catalog.value, false),
-                    resume,
-                    true,
-                    {},
-                    {},
-                    {},
-                    {},
+                    state = HomeUiState(catalog.value, false),
+                    resume = resume,
+                    reduceMotion = true,
                     folders = listOf(folder),
-                    onFolder = { opened = true },
+                    onAction = { action ->
+                        when (action) {
+                            is HomeAction.OpenFolder -> {
+                                val it = action.id
+                                opened = true
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
                 if (opened) {
                     FolderPanel(

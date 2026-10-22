@@ -13,6 +13,7 @@ import fr.deuspheara.oree.core.domain.usecase.InitializeLauncherUseCase
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.core.model.WallpaperMode
 import java.io.IOException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,13 +24,16 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-data class WallpaperImportState(
-    val profileId: String,
-    val saving: Boolean = true,
-    val failed: Boolean = false,
-    val completed: Boolean = false,
-)
+enum class LauncherWriteStatus { SAVING, FAILED, COMPLETED }
+
+data class LauncherWriteState(val profileId: String, val status: LauncherWriteStatus)
+
+enum class WallpaperImportStatus { SAVING, FAILED, COMPLETED }
+
+data class WallpaperImportState(val profileId: String, val status: WallpaperImportStatus = WallpaperImportStatus.SAVING)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LauncherViewModel(
@@ -42,29 +46,28 @@ class LauncherViewModel(
     private val importWallpaper: ImportWallpaperUseCase,
 ) : ViewModel() {
     val snapshots = store.snapshots.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), null)
-    suspend fun readSnapshot() = store.readSnapshot()
 
     val canUndoRestore = store.canUndoRestore
     private val mutableImport = MutableStateFlow<WallpaperImportState?>(null)
     val importing = mutableImport.asStateFlow()
 
     fun importPhoto(id: String, uri: String) {
-        if (mutableImport.value?.saving == true) return
+        if (mutableImport.value?.status == WallpaperImportStatus.SAVING) return
         mutableImport.value = WallpaperImportState(id)
         viewModelScope.launch {
             try {
                 importWallpaper(id, uri)
-                mutableImport.value = WallpaperImportState(id, saving = false, completed = true)
+                mutableImport.value = WallpaperImportState(id, status = WallpaperImportStatus.COMPLETED)
             } catch (_: IOException) {
-                mutableImport.value = WallpaperImportState(id, saving = false, failed = true)
+                mutableImport.value = WallpaperImportState(id, status = WallpaperImportStatus.FAILED)
             } catch (_: SecurityException) {
-                mutableImport.value = WallpaperImportState(id, saving = false, failed = true)
+                mutableImport.value = WallpaperImportState(id, status = WallpaperImportStatus.FAILED)
             }
         }
     }
 
     fun clearImportResult() {
-        if (mutableImport.value?.saving != true) mutableImport.value = null
+        if (mutableImport.value?.status != WallpaperImportStatus.SAVING) mutableImport.value = null
     }
 
     private val mutableInitializationFailed = MutableStateFlow(false)
@@ -98,12 +101,15 @@ class LauncherViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), ContentSelection())
 
+    private var initialization: Job? = null
+
     init {
         retryInitialization()
     }
 
     fun retryInitialization() {
-        viewModelScope.launch {
+        if (initialization?.isActive == true) return
+        initialization = viewModelScope.launch {
             try {
                 initialize()
                 mutableInitializationFailed.value = false
@@ -124,33 +130,55 @@ class LauncherViewModel(
     }
 
     /** Accepted mutations outlive route recreation, while Android effects remain in the route. */
-    private suspend fun persist(action: suspend () -> Unit) = viewModelScope.async { action() }.await()
+    private val mutations = Mutex()
+    private val mutableWrite = MutableStateFlow<LauncherWriteState?>(null)
+    val writing = mutableWrite.asStateFlow()
 
-    suspend fun setWallpaper(id: String, mode: WallpaperMode) = persist {
+    fun acknowledgeWrite() {
+        if (mutableWrite.value?.status != LauncherWriteStatus.SAVING) mutableWrite.value = null
+    }
+
+    private suspend fun persist(profileId: String, action: suspend () -> Unit) = viewModelScope.async {
+        mutations.withLock {
+            mutableWrite.value = LauncherWriteState(profileId, LauncherWriteStatus.SAVING)
+            try {
+                action()
+                mutableWrite.value = LauncherWriteState(profileId, LauncherWriteStatus.COMPLETED)
+            } catch (failure: IOException) {
+                mutableWrite.value = LauncherWriteState(profileId, LauncherWriteStatus.FAILED)
+                throw failure
+            } catch (failure: SecurityException) {
+                mutableWrite.value = LauncherWriteState(profileId, LauncherWriteStatus.FAILED)
+                throw failure
+            }
+        }
+    }.await()
+
+    suspend fun setWallpaper(id: String, mode: WallpaperMode) = persist(id) {
         store.setWallpaper(id, mode)
     }
 
-    suspend fun setLandscape(id: String, landscape: Int) = persist {
+    suspend fun setLandscape(id: String, landscape: Int) = persist(id) {
         store.setLandscape(id, landscape)
     }
 
-    suspend fun setContentEnabled(id: String, enabled: Boolean) = persist {
+    suspend fun setContentEnabled(id: String, enabled: Boolean) = persist(id) {
         store.setContentEnabled(id, enabled)
     }
 
-    suspend fun setWatchNextEnabled(id: String, enabled: Boolean) = persist {
+    suspend fun setWatchNextEnabled(id: String, enabled: Boolean) = persist(id) {
         store.setWatchNextEnabled(id, enabled)
     }
 
-    suspend fun setAppPreviewsEnabled(id: String, enabled: Boolean) = persist {
+    suspend fun setAppPreviewsEnabled(id: String, enabled: Boolean) = persist(id) {
         store.setAppPreviewsEnabled(id, enabled)
     }
 
-    suspend fun setAmbientPhotos(id: String, enabled: Boolean) = persist {
+    suspend fun setAmbientPhotos(id: String, enabled: Boolean) = persist(id) {
         store.setAmbientPhotos(id, enabled)
     }
 
-    suspend fun setAmbientClock(id: String, enabled: Boolean) = persist {
+    suspend fun setAmbientClock(id: String, enabled: Boolean) = persist(id) {
         store.setAmbientClock(id, enabled)
     }
 }

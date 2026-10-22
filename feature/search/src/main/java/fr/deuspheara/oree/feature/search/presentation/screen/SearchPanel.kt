@@ -36,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,12 +78,12 @@ import fr.deuspheara.oree.core.designsystem.R
 import fr.deuspheara.oree.core.designsystem.component.SettingsRow
 import fr.deuspheara.oree.core.designsystem.component.panelMotion
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
+import fr.deuspheara.oree.core.designsystem.focus.awaitRegisteredFocus
 import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.designsystem.glass.menuSurface
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.feature.search.domain.SearchItem
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -120,7 +119,8 @@ fun SearchPanel(
         keyboard?.hide()
         list.scrollToItem(position)
         withFrameNanos {}
-        snapshotFlow { requesters[target.id] }.first { it != null }?.requestFocus()
+        val requester = awaitRegisteredFocus { requesters[target.id] }
+        if (requester != null) requester.requestFocus() else input.requestFocus()
     }
     GlassDialog(onDismissRequest = ::close) {
         val windowIme = WindowInsets.isImeVisible

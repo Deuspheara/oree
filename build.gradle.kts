@@ -101,6 +101,13 @@ tasks.register("verifyArchitecture") {
                         ) {
                             "Implementation or Android dependency in portable code: $source imports $dependency"
                         }
+                        if (viewModel) {
+                            check(
+                                !dependency.startsWith("androidx.compose.") &&
+                                    !dependency.startsWith("androidx.lifecycle.compose.") &&
+                                    !dependency.startsWith("org.koin."),
+                            ) { "UI or dependency resolution in ViewModel: $source imports $dependency" }
+                        }
                         if (portable) {
                             check(!dependency.startsWith("androidx.") && !dependency.startsWith("org.koin.")) {
                                 "Framework dependency in $source"

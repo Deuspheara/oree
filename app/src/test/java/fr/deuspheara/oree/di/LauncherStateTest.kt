@@ -1,5 +1,6 @@
 package fr.deuspheara.oree.di
 
+import androidx.lifecycle.ViewModelStore
 import fr.deuspheara.oree.core.domain.repository.CapabilityRepository
 import fr.deuspheara.oree.core.domain.repository.ContentRepository
 import fr.deuspheara.oree.core.domain.repository.InputRepository
@@ -19,6 +20,8 @@ import fr.deuspheara.oree.core.model.PhotoAvailability
 import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.core.model.TvInputs
 import fr.deuspheara.oree.presentation.LauncherViewModel
+import fr.deuspheara.oree.presentation.LauncherWriteStatus
+import fr.deuspheara.oree.presentation.WallpaperImportStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -94,12 +97,12 @@ class LauncherStateTest {
             viewModel.importPhoto("another", "content://fixture/second")
             val recreatedRoute = backgroundScope.launch { viewModel.importing.collect() }
             runCurrent()
-            assertTrue(viewModel.importing.value!!.saving)
+            assertTrue((viewModel.importing.value!!.status == WallpaperImportStatus.SAVING))
             assertEquals(1, imports)
             gate.complete(Unit)
             runCurrent()
             assertEquals(listOf("fixture" to "wallpaper-fixture.jpg"), committed)
-            assertTrue(viewModel.importing.value!!.completed)
+            assertTrue((viewModel.importing.value!!.status == WallpaperImportStatus.COMPLETED))
             viewModel.clearImportResult()
             assertEquals(null, viewModel.importing.value)
             recreatedRoute.cancel()
@@ -125,6 +128,80 @@ class LauncherStateTest {
             assertTrue(viewModel.initializationFailed.value)
             assertTrue(profiles.snapshots.value!!.failed)
         } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun acceptedProfileWritesKeepCapturedIdentityAndFailureAfterRouteCancellation() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val gate = CompletableDeferred<Unit>()
+            val writes = mutableListOf<String>()
+            val profiles = object : ProfileRepository by MemoryProfileFixture() {
+                override suspend fun setAmbientClock(id: String, enabled: Boolean) {
+                    gate.await()
+                    writes += id
+                    throw java.io.IOException("fixture")
+                }
+            }
+            val viewModel = model(
+                profiles,
+                object : WallpaperRepository {
+                    override suspend fun importImage(uri: String): String = error("Unused")
+                    override suspend fun discard(name: String) = Unit
+                },
+            )
+            owner.put("launcher", viewModel)
+            val route = launch { viewModel.setAmbientClock("captured", false) }
+            runCurrent()
+            route.cancel()
+            assertEquals(LauncherWriteStatus.SAVING, viewModel.writing.value?.status)
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("captured"), writes)
+            assertEquals("captured", viewModel.writing.value?.profileId)
+            assertEquals(LauncherWriteStatus.FAILED, viewModel.writing.value?.status)
+        } finally {
+            owner.clear()
+            runCurrent()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun repeatedInitializationRetriesShareOneAcceptedRead() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val gate = CompletableDeferred<Unit>()
+            var reads = 0
+            val fixture = MemoryProfileFixture()
+            val profiles = object : ProfileRepository by fixture {
+                override suspend fun readSnapshot(): ProfileSnapshot? {
+                    reads++
+                    gate.await()
+                    return fixture.readSnapshot()
+                }
+            }
+            val viewModel = model(
+                profiles,
+                object : WallpaperRepository {
+                    override suspend fun importImage(uri: String): String = error("Unused")
+                    override suspend fun discard(name: String) = Unit
+                },
+            )
+            owner.put("launcher", viewModel)
+            repeat(10) { viewModel.retryInitialization() }
+            runCurrent()
+            assertEquals(1, reads)
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(false, viewModel.initializationFailed.value)
+        } finally {
+            owner.clear()
+            runCurrent()
             Dispatchers.resetMain()
         }
     }

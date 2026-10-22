@@ -41,7 +41,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +85,7 @@ import fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork
 import fr.deuspheara.oree.core.designsystem.component.SettingsRow
 import fr.deuspheara.oree.core.designsystem.component.panelMotion
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
+import fr.deuspheara.oree.core.designsystem.focus.awaitRegisteredFocus
 import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.designsystem.glass.menuSurface
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
@@ -97,7 +97,6 @@ import fr.deuspheara.oree.core.model.restoreAppId
 import fr.deuspheara.oree.feature.home.presentation.component.AppTile
 import fr.deuspheara.oree.feature.home.presentation.state.HomeGridSlot
 import fr.deuspheara.oree.feature.home.presentation.state.HomeNavigationMotion
-import kotlinx.coroutines.flow.first
 
 @Composable
 fun FolderTile(
@@ -392,7 +391,8 @@ fun FolderPanel(
                 if (index >= 0) {
                     grid.scrollToItem(index)
                     withFrameNanos {}
-                    snapshotFlow { requesters[target] }.first { it != null }?.requestFocus()
+                    val requester = awaitRegisteredFocus { requesters[target] }
+                    if (requester != null) requester.requestFocus() else rename.requestFocus()
                 }
             }
         }

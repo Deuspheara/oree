@@ -7,6 +7,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.StateRestorationTester
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,6 +24,7 @@ import fr.deuspheara.oree.core.model.AccentColor
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.ThemeMode
 import fr.deuspheara.oree.feature.settings.presentation.screen.SettingsScreen
+import fr.deuspheara.oree.feature.settings.presentation.state.SettingsAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,7 +40,20 @@ class SettingsScreenTest {
         var saved by mutableStateOf(LauncherPreferences())
         compose.setContent {
             HazeTestTheme(saved) {
-                SettingsScreen(saved, { saved = it }, {}, {}, 0, {})
+                SettingsScreen(
+                    value = saved,
+                    cacheBytes = 0,
+                    onAction = { action ->
+                        when (action) {
+                            is SettingsAction.ChangePreferences -> {
+                                val it = action.value
+                                saved = it
+                            }
+
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose.onNodeWithTag("settings-category:APPEARANCE").assertIsFocused().performKeyInput {
@@ -59,7 +74,22 @@ class SettingsScreenTest {
     fun glassIntensityAndOffUpdateImmediately() {
         var saved by mutableStateOf(LauncherPreferences())
         compose.setContent {
-            HazeTestTheme(saved) { SettingsScreen(saved, { saved = it }, {}, {}, 0, {}) }
+            HazeTestTheme(saved) {
+                SettingsScreen(
+                    value = saved,
+                    cacheBytes = 0,
+                    onAction = { action ->
+                        when (action) {
+                            is SettingsAction.ChangePreferences -> {
+                                val it = action.value
+                                saved = it
+                            }
+
+                            else -> Unit
+                        }
+                    },
+                )
+            }
         }
         compose.onNodeWithTag("settings-glass-intensity").performScrollTo().activateByRemote()
         compose.runOnIdle { assertEquals(1f, saved.glassIntensity) }
@@ -75,14 +105,18 @@ class SettingsScreenTest {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 SettingsScreen(
-                    LauncherPreferences(),
-                    {},
-                    {},
-                    {},
-                    0,
-                    {},
+                    value = LauncherPreferences(),
+                    cacheBytes = 0,
                     writeFailed = true,
-                    onRetrySave = { retries++ },
+                    onAction = { action ->
+                        when (action) {
+                            SettingsAction.RetrySave -> {
+                                retries++
+                            }
+
+                            else -> Unit
+                        }
+                    },
                 )
             }
         }
@@ -97,7 +131,24 @@ class SettingsScreenTest {
         var cleared = false
         compose.setContent {
             HazeTestTheme(saved) {
-                SettingsScreen(saved, { saved = it }, {}, {}, 4096, { cleared = true })
+                SettingsScreen(
+                    value = saved,
+                    cacheBytes = 4096,
+                    onAction = { action ->
+                        when (action) {
+                            SettingsAction.ClearCache -> {
+                                cleared = true
+                            }
+
+                            is SettingsAction.ChangePreferences -> {
+                                val it = action.value
+                                saved = it
+                            }
+
+                            else -> Unit
+                        }
+                    },
+                )
             }
         }
         compose
@@ -112,6 +163,23 @@ class SettingsScreenTest {
         compose.onNodeWithTag("settings-category:APPEARANCE").activateByRemote()
         compose.onNodeWithTag("settings-defaults").performScrollTo().activateByRemote()
         compose.runOnIdle { assertEquals(LauncherPreferences(), saved) }
+    }
+
+    @Test
+    fun selectedCategoryAndEntryFocusSurviveSavedStateRestoration() {
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        restoration.setContent {
+            HazeTestTheme(LauncherPreferences()) {
+                SettingsScreen(LauncherPreferences(), cacheBytes = 0, reduceMotion = true, onAction = {})
+            }
+        }
+        compose.onNodeWithTag("settings-categories")
+            .performScrollToNode(hasTestTag("settings-category:ACCESSIBILITY"))
+        compose.onNodeWithTag("settings-category:ACCESSIBILITY").activateByRemote()
+        compose.onNodeWithTag("settings-contrast").assertIsDisplayed()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("settings-contrast").assertIsDisplayed()
+        compose.onNodeWithTag("settings-category:ACCESSIBILITY").assertIsFocused()
     }
 
     private fun SemanticsNodeInteraction.activateByRemote() {

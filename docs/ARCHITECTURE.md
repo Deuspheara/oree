@@ -36,6 +36,41 @@ Package/provider observers use subscription ownership with zero stop timeout. Fe
 
 Inject IO and Default dispatchers for blocking work and ranking/pixel calculations. Serialize writes; a later setting must not cancel an accepted transaction. Initialization, Home projection, wallpaper import/cleanup, profile deletion/cleanup and backup restore are use cases. Simple typed mutations stay repository operations.
 
+## Presentation contracts
+
+- Home and Settings dispatch feature-scoped `HomeAction` / `SettingsAction` intentions. Their
+  control sets describe available affordances independently from event delivery. Reusable cards,
+  form fields and controls keep small local callbacks. App handles cross-feature navigation and
+  Android results; features never resolve another feature's ViewModel.
+- `HomeUiState` owns catalog loading/cached failure. Organization and launcher writes expose
+  separate profile-tagged operation state, with mutually exclusive saving/completed/failed
+  statuses. Routes may disappear while accepted writes finish; new waiters must not cancel them.
+  Mutexes serialize accepted writes and failures remain observable without the original waiter.
+- Settings keeps preferences, backup preparation and restore progress separate. Backup commands
+  capture document strings, survive route recreation, reject overlapping work, flush preferences
+  and read the committed profile snapshot for review. Export completion is acknowledged after its
+  route displays feedback. Restore still uses the atomic reviewed-snapshot/undo contract.
+- `ProfilesRoute` observes/acknowledges edit completion; `ProfilePanel` owns its saveable captured
+  editor ID, name and avatar draft. Profile edit, restore and wallpaper import statuses cannot
+  describe saving and completion simultaneously.
+- Search results carry the request that produced them. `SearchRoute` only presents a result set
+  matching its current request; replay from another query/catalog cannot restore stale focus.
+  Ranking stays on injected Default and stops with zero subscribers.
+- `HomeFocusState` owns requesters, lazy states, directional motion and the current restoration
+  job. Saveable selected IDs/indices remain local to Home. Job identity is not rendered state.
+  Home, folders and Search wait at most one second for lazy requester registration, preserve
+  caller cancellation and fall back to a surviving header/form/query control when absent. This
+  timeout is a liveness bound, not an input-latency budget or performance measurement.
+- Settings renders category sections with their own inputs. Content, backup and ambient data
+  have independent small contracts rather than an application-wide state bag. `AmbientRoute`
+  owns optional lifecycle-bound photo IO; its screen owns slideshow and input presentation.
+
+Do not introduce base ViewModels, reducers or application-wide generic operation runners. Use cases remain for
+business orchestration already shared across callers; simple mutations stay repository methods.
+Only deliberately accepted writes should use a ViewModel-owned `async` with an awaited result:
+this preserves commit ownership and delivers failure to a waiting route. Reads normally retain
+caller cancellation. `verifyArchitecture` rejects Compose and Koin imports in ViewModel sources.
+
 ## Persistence
 
 DataStore owns bounded configuration; Room is deferred until relational queries or partial updates justify it. Keep DataStore names/keys, profile schema versions, backup format 1 and legacy readers compatible. The backup reader accepts the legacy exporter discriminator intentionally.

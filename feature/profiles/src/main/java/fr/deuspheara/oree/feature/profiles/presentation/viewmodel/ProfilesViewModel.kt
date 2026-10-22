@@ -9,24 +9,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class ProfilesUiState(val saving: Boolean = false, val failed: Boolean = false, val completed: Boolean = false)
+enum class ProfileEditStatus { IDLE, SAVING, FAILED, COMPLETED }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+data class ProfilesUiState(val status: ProfileEditStatus = ProfileEditStatus.IDLE)
+
 class ProfilesViewModel(private val profiles: ProfileRepository, private val deleteProfile: DeleteProfileUseCase) : ViewModel() {
     private val mutable = MutableStateFlow(ProfilesUiState())
     val state = mutable.asStateFlow()
 
     private fun edit(action: suspend () -> Unit) {
-        if (mutable.value.saving) return
-        mutable.value = ProfilesUiState(saving = true)
+        if (mutable.value.status == ProfileEditStatus.SAVING) return
+        mutable.value = ProfilesUiState(status = ProfileEditStatus.SAVING)
         viewModelScope.launch {
             try {
                 action()
-                mutable.value = ProfilesUiState(completed = true)
+                mutable.value = ProfilesUiState(status = ProfileEditStatus.COMPLETED)
             } catch (_: IOException) {
-                mutable.value = ProfilesUiState(failed = true)
+                mutable.value = ProfilesUiState(status = ProfileEditStatus.FAILED)
             } catch (_: SecurityException) {
-                mutable.value = ProfilesUiState(failed = true)
+                mutable.value = ProfilesUiState(status = ProfileEditStatus.FAILED)
             }
         }
     }
@@ -40,6 +41,6 @@ class ProfilesViewModel(private val profiles: ProfileRepository, private val del
     fun delete(id: String) = edit { deleteProfile(id) }
 
     fun acknowledge() {
-        if (!mutable.value.saving) mutable.value = ProfilesUiState()
+        if (mutable.value.status != ProfileEditStatus.SAVING) mutable.value = ProfilesUiState()
     }
 }
