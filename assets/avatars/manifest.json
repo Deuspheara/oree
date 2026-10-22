@@ -1,0 +1,66 @@
+[
+  {
+    "id": "avatar_01",
+    "master": "assets/avatars/masters/avatar_01.png",
+    "masterSha256": "f45d5ab432e651b67b0c41b9d99915bb412822f4943191a820a3b3d068ce0b35",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_01.webp",
+    "runtimeBytes": 5406,
+    "runtimeSha256": "3b1d9229a658346c82858953234f0513fd7c4ed1d924b4971da15448d24a6930"
+  },
+  {
+    "id": "avatar_02",
+    "master": "assets/avatars/masters/avatar_02.png",
+    "masterSha256": "dbcb0bb4e23f898911f58a3d5dfb3bf9e0a2db351a049d5c55eeefe024e4208f",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_02.webp",
+    "runtimeBytes": 5240,
+    "runtimeSha256": "62e6aa47584880dbc804824d9ce747dbf140bd88b7b5ee6bbfb8ad6cfa7e6e2b"
+  },
+  {
+    "id": "avatar_03",
+    "master": "assets/avatars/masters/avatar_03.png",
+    "masterSha256": "f71e6dbbe91e12c17536975543471761b5777c85b5cd348966e109ba1d485e5d",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_03.webp",
+    "runtimeBytes": 3736,
+    "runtimeSha256": "9ad25900979c24b3d82932ca522af7992e4e6500e5c7356c47ffff40c43afcb9"
+  },
+  {
+    "id": "avatar_04",
+    "master": "assets/avatars/masters/avatar_04.png",
+    "masterSha256": "bd157aa9fe96b56eccc77f5072bdc4a384029f937ae5876a76edf5cd767ea765",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_04.webp",
+    "runtimeBytes": 4968,
+    "runtimeSha256": "c5d25f4e7adf6aae9a0390a09cc9c4a5e9af0d28705a5b1e4f658d0cc0f92cea"
+  },
+  {
+    "id": "avatar_05",
+    "master": "assets/avatars/masters/avatar_05.png",
+    "masterSha256": "e73c092c6d7baa589c5cfe47d3991000a946ba8653a1eac6869d811eb8cf59db",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_05.webp",
+    "runtimeBytes": 6642,
+    "runtimeSha256": "3a408cb998f6a386ee059425eb0df13a7830b48f9b6c098cbf90811cc162ea66"
+  },
+  {
+    "id": "avatar_06",
+    "master": "assets/avatars/masters/avatar_06.png",
+    "masterSha256": "cc215a40d70f057d0f6b07f090b9381c10c91e62ad460c6fa0b94fb08a244fde",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_06.webp",
+    "runtimeBytes": 4194,
+    "runtimeSha256": "ca7735106975fe0a0f91c5aef8760113ba62179b34ff91d61fa91db5d4285cdf"
+  },
+  {
+    "id": "avatar_07",
+    "master": "assets/avatars/masters/avatar_07.png",
+    "masterSha256": "f197d8b1a5135d0002f88a4494a626bfc8f1d6e0ab61d5df3e743a80a0e467ad",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_07.webp",
+    "runtimeBytes": 4196,
+    "runtimeSha256": "f207f3d6b03c97b8fb63fbcbea5e195d79dbbfb168ec24682a763d8690ab1283"
+  },
+  {
+    "id": "avatar_08",
+    "master": "assets/avatars/masters/avatar_08.png",
+    "masterSha256": "67cbb77f7758971d5e34a7a0643c9115bb39c48c6facada10c2692b94bf8bf5e",
+    "runtime": "core/designsystem/src/main/res/drawable-nodpi/avatar_08.webp",
+    "runtimeBytes": 5888,
+    "runtimeSha256": "ea8df0ce6df0b74dca6bb83b70513dcd51301d44e3c463d97e6c16d86fe2443f"
+  }
+]

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="fr.deuspheara.oree.BackupFixtureProvider"
+            android:authorities="fr.deuspheara.oree.backupfixture" android:exported="false" />
+        <!-- Constant image fixture, same UID; absent from benchmark/release APKs. -->
+        <provider android:name="fr.deuspheara.oree.TestWallpaperProvider"
+            android:authorities="fr.deuspheara.oree.fixture" android:exported="false" />
+    </application>
+</manifest>

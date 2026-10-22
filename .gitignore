@@ -1,0 +1,40 @@
+# Android and Gradle local output
+.gradle/
+.kotlin/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+local.properties
+*.iml
+.idea/
+.fleet/
+.vscode/
+
+# Local evidence and generated reports
+.private/
+*.apk
+*.aab
+*.apks
+*.hprof
+*.jfr
+*.trace
+*.perfetto-trace
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.key
+signing.properties
+
+# Operating system files
+.DS_Store
+Thumbs.db

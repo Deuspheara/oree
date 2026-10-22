@@ -1,0 +1,33 @@
+name: Android
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check avatar assets
+        run: python3 scripts/export-avatars.py --check
+      - name: Verify Android build
+        run: >-
+          ./gradlew spotlessCheck verifyArchitecture test lintDebug
+          :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleBenchmarkRelease
+          :app:assembleDebugAndroidTest :benchmark:assembleNonMinifiedRelease
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-verification
+          path: |
+            build/reports/
+            app/build/reports/
+            core/**/build/reports/
+            feature/**/build/reports/
+            app/build/outputs/apk/benchmarkRelease/
