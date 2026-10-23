@@ -7,10 +7,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.platform.app.InstrumentationRegistry
 import fr.deuspheara.oree.core.designsystem.glass.LocalOpaquePanels
@@ -50,6 +52,7 @@ class SettingsVisualTest {
                     CompositionLocalProvider(LocalOpaquePanels provides true) {
                         SettingsScreen(
                             value = value,
+                            initiallyInCategory = true,
                             cacheBytes = 0,
                             reduceMotion = true,
                             onAction = { action ->
@@ -82,6 +85,7 @@ class SettingsVisualTest {
             }
         }
         capture("dark-top")
+        compose.onNodeWithTag("settings-content").performScrollToNode(hasTestTag("glass-preview"))
         compose.onNodeWithTag("glass-preview").performScrollTo()
         capture("dark-preview")
         compose.runOnIdle { value = value.copy(theme = ThemeMode.LIGHT) }
@@ -92,6 +96,7 @@ class SettingsVisualTest {
             it(0f, -10000f)
         }
         capture("light-top")
+        compose.onNodeWithTag("settings-content").performScrollToNode(hasTestTag("accent:GREEN"))
         compose.onNodeWithTag("accent:GREEN").performScrollTo().performSemanticsAction(
             androidx.compose.ui.semantics.SemanticsActions.RequestFocus,
         ) {
@@ -102,8 +107,10 @@ class SettingsVisualTest {
         compose.runOnIdle {
             value = value.copy(textScale = 2f, highContrast = true, reduceTransparency = true)
         }
+        compose.onNodeWithTag("settings-content").performScrollToNode(hasTestTag("glass-preview"))
         compose.onNodeWithTag("glass-preview").performScrollTo().assertIsDisplayed()
         capture("light-large-opaque")
+        compose.onNodeWithTag("settings-content").performScrollToNode(hasTestTag("settings-defaults"))
         compose.onNodeWithTag("settings-defaults").performScrollTo().assertIsDisplayed()
         compose.runOnIdle {
             english = true

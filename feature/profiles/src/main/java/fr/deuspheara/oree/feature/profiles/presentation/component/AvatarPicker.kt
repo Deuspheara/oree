@@ -185,7 +185,7 @@ private fun AvatarChoice(
 }
 
 @Composable
-private fun AvatarSelectionBadge(modifier: Modifier = Modifier) {
+internal fun AvatarSelectionBadge(modifier: Modifier = Modifier) {
     Box(
         modifier
             .size(20.dp)

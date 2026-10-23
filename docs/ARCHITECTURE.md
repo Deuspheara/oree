@@ -82,3 +82,35 @@ Changing Android application ID creates a separate sandbox; it does not transfer
 ## Build quality
 
 Spotless/ktlint and `.editorconfig` define formatting. Android Lint is mandatory. Compose compiler reports are generated per Compose module; use them before adding stability annotations. Type-resolved Detekt is deferred until compatibility with the pinned Kotlin toolchain is established. Preserve rendering, cache/decode limits, input bounds and reduced-motion behavior; DI/module extraction has no assumed performance benefit.
+
+Settings Appearance's presentation-only lazy builder emits stable row keys. Focus memory
+maps its saved row to that item order, reveals it and uses the shared bounded registration
+wait before requesting focus. This changes no preference schema or write scheduling. Home's
+navigation quiet-period job belongs to HomeFocusState; ordinary D-pad events do not increment
+an observable screen-wide timer counter.
+
+Settings retains the Home composition under its own screen instead of disposing/rebuilding
+its focus graph on every visit. Covered Home is transparent, excluded from semantics and
+focus, and suspends its clock, selection preview and restoration effects. Its Back handlers
+are disabled until revealed. Closing Settings restores the captured Home destination. The
+retained subtree keeps a stable material policy; Settings still owns its opaque panel policy.
+Home also guards focus-memory callbacks with native window ownership. Covered-window
+callbacks cannot replace the saved header/card destination, and restoration waits for the
+parent window to regain focus. This applies to Control Center and folder/overview dialogs as
+well as Settings return.
+The opaque-panel composition local tracks its readers because navigation changes it. A static
+local would invalidate the entire launcher scene when Settings opens. Focus callbacks read
+live native-window ownership rather than retaining a window-focus Boolean from the previous
+composition, so ownership changes between frames cannot rewrite Home focus memory.
+Covered-state guards also use a retained current-state reference: focus modifier updates can
+emit callbacks before child callbacks have been replaced during applyChanges. Continuation
+position memory is separate from active row ownership. Captured header restoration takes
+precedence over provider invalidations while revealing Home.
+
+Visual setup is presentation-owned draft state with typed ExperienceAction events. The app
+root gates welcome on committed profile preferences and submits completion through the
+existing profile-scoped accepted PreferenceWriter. Optional setupComplete and motionIntensity
+fields preserve schema/version compatibility: absent legacy fields decode to completed setup
+and full motion. Imported values receive the same strict type/range validation as other
+appearance fields. Settings category focus/viewport survive one-column navigation in the
+existing saveable scopes; requester registration remains bounded and cancellable.

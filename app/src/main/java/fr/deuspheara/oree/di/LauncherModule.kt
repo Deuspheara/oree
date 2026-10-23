@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import coil3.ImageLoader
 import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import fr.deuspheara.oree.core.data.datastore.profileDataStore
 import fr.deuspheara.oree.core.data.migration.DataStoreLegacyOrganization
 import fr.deuspheara.oree.core.data.migration.DataStoreLegacyPreferences
@@ -40,14 +41,17 @@ import fr.deuspheara.oree.core.platform.datasource.photos.MediaStorePhotoSource
 import fr.deuspheara.oree.core.platform.image.WallpaperRenderer
 import fr.deuspheara.oree.core.platform.image.impl.AndroidWallpaperStore
 import fr.deuspheara.oree.core.platform.image.impl.ArtworkReflections
+import fr.deuspheara.oree.core.platform.image.impl.LocalPhotoThumbnailFetcher
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeViewModel
 import fr.deuspheara.oree.feature.profiles.presentation.viewmodel.ProfilesViewModel
 import fr.deuspheara.oree.feature.search.presentation.viewmodel.SearchViewModel
 import fr.deuspheara.oree.feature.settings.presentation.viewmodel.SettingsViewModel
 import fr.deuspheara.oree.presentation.LauncherViewModel
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -86,13 +90,28 @@ val launcherModule = module {
             WatchNextContentSource(androidContext(), dispatchers = get(), clock = get()),
             PreviewProgramsContentSource(androidContext(), dispatchers = get()),
             get(),
+            get(),
         )
     }
     single { ArtworkReflections(get()) }
     single {
+        val artworkClient = OkHttpClient.Builder()
+            .followSslRedirects(false)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                if (!chain.request().url.isHttps) throw java.io.IOException("HTTPS artwork required")
+                chain.proceed(chain.request())
+            }
+            .build()
         ImageLoader.Builder(androidContext())
             .memoryCache { MemoryCache.Builder().maxSizeBytes(12L * 1024 * 1024).build() }
-            .components { add(get<ArtworkReflections>()) }
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { artworkClient }))
+                add(get<ArtworkReflections>())
+                add(LocalPhotoThumbnailFetcher.Factory(get()))
+            }
             .diskCache(null)
             .build()
     }

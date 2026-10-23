@@ -1,10 +1,14 @@
 package fr.deuspheara.oree.feature.home.presentation.screen
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -41,10 +46,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -58,13 +65,16 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -75,27 +85,37 @@ import fr.deuspheara.oree.core.designsystem.component.HomeClock
 import fr.deuspheara.oree.core.designsystem.component.LauncherIcon
 import fr.deuspheara.oree.core.designsystem.component.LauncherSymbol
 import fr.deuspheara.oree.core.designsystem.focus.awaitRegisteredFocus
-import fr.deuspheara.oree.core.designsystem.glass.GlassSurfaceRole
-import fr.deuspheara.oree.core.designsystem.glass.GlassTreatment
-import fr.deuspheara.oree.core.designsystem.glass.RetainedMenuSurface
-import fr.deuspheara.oree.core.designsystem.glass.glassSurface
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens as D
 import fr.deuspheara.oree.core.designsystem.theme.MotionTokens as M
 import fr.deuspheara.oree.core.domain.usecase.ProjectHomeUseCase
 import fr.deuspheara.oree.core.model.AppFolder
 import fr.deuspheara.oree.core.model.ContentEntry
+import fr.deuspheara.oree.core.model.ContentSourceId
+import fr.deuspheara.oree.core.model.HomeContentLayout
 import fr.deuspheara.oree.core.model.LocalProfile
+import fr.deuspheara.oree.core.model.MAX_DOCK_FAVORITES
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.feature.home.presentation.component.AppTile
-import fr.deuspheara.oree.feature.home.presentation.component.ContentCard
+import fr.deuspheara.oree.feature.home.presentation.component.DockSurface
+import fr.deuspheara.oree.feature.home.presentation.component.FolderPeek
+import fr.deuspheara.oree.feature.home.presentation.component.FolderQuickPreview
 import fr.deuspheara.oree.feature.home.presentation.component.FolderTile
+import fr.deuspheara.oree.feature.home.presentation.component.HomeContinuationRow
 import fr.deuspheara.oree.feature.home.presentation.component.HomeHeader
+import fr.deuspheara.oree.feature.home.presentation.component.HomeOverview
+import fr.deuspheara.oree.feature.home.presentation.component.HomeSection
 import fr.deuspheara.oree.feature.home.presentation.state.HomeAction
 import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.state.HomeGridSlot
+import fr.deuspheara.oree.feature.home.presentation.state.homeArtworkSize
+import fr.deuspheara.oree.feature.home.presentation.state.homeGridArtworkSize
 import fr.deuspheara.oree.feature.home.presentation.state.rememberHomeFocusState
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeUiState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private sealed interface CatalogEntry {
@@ -124,9 +144,9 @@ fun HomeScreen(
     favorites: List<String> = emptyList(),
     profile: LocalProfile? = null,
     hideCards: Boolean = false,
+    backgroundOnly: Boolean = false,
     editRequested: Int = 0,
     contentEntries: List<ContentEntry> = emptyList(),
-    retainDock: Boolean = false,
     sourceKey: Any? = null,
     movingFavorite: String? = null,
     moveSaving: Boolean = false,
@@ -134,6 +154,7 @@ fun HomeScreen(
     folders: List<AppFolder> = emptyList(),
     appPreviewsEnabled: Boolean = false,
     controls: Set<HomeControl> = emptySet(),
+    onBackdropChanged: (Boolean) -> Unit = {},
 ) {
     val onOpen = { app: TvApp -> onAction(HomeAction.OpenApp(app)) }
     val onRetry = { onAction(HomeAction.Retry) }
@@ -150,7 +171,32 @@ fun HomeScreen(
     } else {
         null
     }
+    val covered = androidx.compose.runtime.rememberUpdatedState(backgroundOnly)
     val focus = rememberHomeFocusState()
+    val focusManager = LocalFocusManager.current
+    var overviewReturn by remember { mutableStateOf(false) }
+    var peekReturn by remember { mutableStateOf<String?>(null) }
+    var pendingSection by remember { mutableStateOf<HomeSection?>(null) }
+    val homeWindowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    val homeInputMode = androidx.compose.ui.platform.LocalInputModeManager.current
+    val homeWindowFocused = homeWindowInfo.isWindowFocused
+    var overviewOpen by rememberSaveable { mutableStateOf(false) }
+    var peekFolderId by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastCatalog by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastFolder by rememberSaveable { mutableStateOf<String?>(null) }
+    var fastNavigation by remember { mutableStateOf(false) }
+    val overviewScale = androidx.compose.animation.core.animateFloatAsState(
+        if (overviewOpen) .90f else 1f,
+        androidx.compose.animation.core.tween(if (reduceMotion || economy || systemReduceMotion == true) 0 else 220),
+        label = "home-overview-compression",
+    )
+    val backdropChanged by androidx.compose.runtime.rememberUpdatedState(onBackdropChanged)
+    val catalogRaised by remember {
+        derivedStateOf {
+            focus.grid.firstVisibleItemIndex > 0 || focus.grid.firstVisibleItemScrollOffset > 96
+        }
+    }
+    LaunchedEffect(catalogRaised) { backdropChanged(catalogRaised) }
     var editingApps by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(editRequested) { if (editRequested > 0) editingApps = true }
     val projection =
@@ -172,25 +218,98 @@ fun HomeScreen(
     var previewPackage by remember { mutableStateOf<String?>(null) }
     val shownContent =
         remember(contentEntries, appPreviewsEnabled, previewPackage) {
-            if (appPreviewsEnabled) {
-                contentEntries.filter { it.source == previewPackage }
-            } else {
-                contentEntries
-            }
+            contentEntries.filter {
+                it.provider == ContentSourceId.WATCH_NEXT ||
+                    (appPreviewsEnabled && it.source == previewPackage)
+            }.distinctBy { it.source }.take(20)
         }
     var previousIndex by rememberSaveable { mutableIntStateOf(0) }
     // layoutInfo changes every scroll frame; only a column-count change affects row edges.
     val columns by remember(focus.grid) { derivedStateOf { focus.grid.layoutInfo.maxSpan.coerceAtLeast(1) } }
     var lastContent by rememberSaveable { mutableStateOf<String?>(null) }
+    var rememberedContent by rememberSaveable { mutableStateOf<String?>(null) }
     val contentIds = remember(shownContent) { shownContent.map { it.id } }
     val scope = rememberCoroutineScope()
     var control by rememberSaveable { mutableStateOf<String?>(null) }
-    val reduced = reduceMotion || (systemReduceMotion ?: false) || economy
+    val pageReduced = reduceMotion || (systemReduceMotion ?: false) || backgroundOnly
+    val reduced = pageReduced || economy
     val statusRow = state.loading || state.failed || state.apps.isEmpty()
-    val base = 2 + (if (shownContent.isNotEmpty()) 1 else 0) + (if (statusRow) 1 else 0)
+    val heroContent = shownContent.isNotEmpty() && profile?.preferences?.homeContentLayout == HomeContentLayout.ABOVE_DOCK
+    val rowContent = shownContent.isNotEmpty() && !heroContent
+    val base = 2 + (if (rowContent) 1 else 0) + (if (statusRow) 1 else 0)
+    LaunchedEffect(focus.grid, pageReduced) {
+        if (pageReduced) return@LaunchedEffect
+        snapshotFlow { focus.grid.isScrollInProgress }.collectLatest { scrolling ->
+            if (!scrolling) return@collectLatest
+            do {
+                withFrameNanos { frameTime ->
+                    val grid = focus.grid
+                    val position = if (grid.firstVisibleItemIndex <= 1 && focus.contextHeightPx > 0) {
+                        val context = if (grid.firstVisibleItemIndex == 1) {
+                            focus.contextHeightPx + grid.layoutInfo.mainAxisItemSpacing
+                        } else {
+                            0
+                        }
+                        (context + grid.firstVisibleItemScrollOffset).toFloat()
+                    } else {
+                        null
+                    }
+                    focus.pageReturnMotion.sample(position, frameTime, System.nanoTime())
+                }
+            } while (focus.grid.isScrollInProgress)
+        }
+    }
     suspend fun parkDock(animated: Boolean = true) {
         if (focus.grid.firstVisibleItemIndex == 0 && focus.grid.firstVisibleItemScrollOffset == 0) return
-        if (animated && !reduced) focus.grid.animateScrollToItem(0) else focus.grid.scrollToItem(0)
+        if (!animated || pageReduced) {
+            focus.grid.scrollToItem(0)
+        } else if (focus.grid.firstVisibleItemIndex <= 1 && focus.contextHeightPx > 0) {
+            // The measured hero occupies one complete grid row. Animate its exact remaining
+            // distance, including a partially completed return, without a held-key snap.
+            val contextDistance = if (focus.grid.firstVisibleItemIndex == 1) {
+                focus.contextHeightPx + focus.grid.layoutInfo.mainAxisItemSpacing
+            } else {
+                0
+            }
+            val distance = -(contextDistance + focus.grid.firstVisibleItemScrollOffset).toFloat()
+            val returnEasing = focus.pageReturnMotion.easing(distance, System.nanoTime())
+            if (returnEasing !== FastOutSlowInEasing && android.os.Build.VERSION.SDK_INT >= 29 && android.os.Trace.isEnabled()) {
+                android.os.Trace.beginSection("TVL:pageReturnHandoff")
+                android.os.Trace.endSection()
+            }
+            focus.grid.animateScrollBy(distance, tween(420, easing = returnEasing))
+        } else {
+            focus.grid.animateScrollToItem(0)
+        }
+    }
+    suspend fun revealForFocus(item: Int, animated: Boolean) {
+        if (!animated || pageReduced) {
+            focus.grid.scrollToItem(item)
+        } else if (item < focus.grid.firstVisibleItemIndex) {
+            // Upward navigation only needs to place the destination before handing its
+            // reveal to Foundation. Waiting for full alignment keeps focus on the old
+            // card, where repeated Up restarts the same preparatory animation.
+            coroutineScope {
+                var destinationPlaced = false
+                val reveal = launch { focus.grid.animateScrollToItem(item) }
+                val handoff = launch {
+                    snapshotFlow { focus.grid.layoutInfo.visibleItemsInfo.any { it.index == item } }
+                        .first { it }
+                    destinationPlaced = true
+                    reveal.cancel()
+                }
+                try {
+                    reveal.join()
+                    if (reveal.isCancelled && !destinationPlaced) {
+                        throw CancellationException("Home reveal interrupted before focus handoff")
+                    }
+                } finally {
+                    handoff.cancel()
+                }
+            }
+        } else {
+            focus.grid.animateScrollToItem(item)
+        }
     }
     suspend fun focusApp(id: String, animated: Boolean = false) {
         val fi = favoriteApps.indexOfFirst { it.id == id }
@@ -201,10 +320,10 @@ fun HomeScreen(
                 focus.grid.layoutInfo.visibleItemsInfo.isNotEmpty() &&
                 focus.grid.layoutInfo.visibleItemsInfo.none { it.index == 1 }
             ) {
-                if (animated && !reduced) focus.grid.animateScrollToItem(1) else focus.grid.scrollToItem(1)
+                revealForFocus(1, animated)
             }
         } else if (focus.grid.layoutInfo.visibleItemsInfo.none { it.index == item }) {
-            focus.grid.scrollToItem(item)
+            if (animated && !pageReduced) focus.grid.animateScrollToItem(item) else focus.grid.scrollToItem(item)
         }
         if (fi >= 0 && focus.dock.layoutInfo.visibleItemsInfo.none { it.key == id }) focus.dock.scrollToItem(fi)
         // Item relocation (dock <-> catalog) disposes and registers a different requester.
@@ -215,13 +334,13 @@ fun HomeScreen(
     }
     suspend fun focusEmptyDock() {
         if (focus.grid.layoutInfo.visibleItemsInfo.none { it.index == 1 }) {
-            if (!reduced) focus.grid.animateScrollToItem(1) else focus.grid.scrollToItem(1)
+            revealForFocus(1, animated = true)
         }
         withFrameNanos {}
         focus.add.requestFocus()
     }
-    LaunchedEffect(movingFavorite) {
-        if (movingFavorite != null) {
+    LaunchedEffect(movingFavorite, backgroundOnly) {
+        if (movingFavorite != null && !backgroundOnly) {
             focus.restoration?.cancel()
             parkDock(animated = false)
             focusApp(movingFavorite)
@@ -234,12 +353,33 @@ fun HomeScreen(
     }
     suspend fun focusContent() {
         if (shownContent.isEmpty()) return
-        val index = shownContent.indexOfFirst { it.id == lastContent }.coerceAtLeast(0)
-        if (focus.grid.layoutInfo.visibleItemsInfo.none { it.key == "watch-next" }) focus.grid.scrollToItem(2)
-        focus.contentRow.scrollToItem(index)
+        val index = shownContent.indexOfFirst { it.id == (lastContent ?: rememberedContent) }.coerceAtLeast(0)
+        val contentIndex = if (heroContent) 0 else 2
+        if (focus.grid.layoutInfo.visibleItemsInfo.none { it.index == contentIndex }) {
+            revealForFocus(contentIndex, animated = true)
+        }
+        if (focus.contentRow.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            focus.contentRow.scrollToItem(index)
+        }
         withFrameNanos {}
         val target = awaitRegisteredFocus { focus.contentRequesters[shownContent[index].id] }
         if (target != null) target.requestFocus() else focus.commands.requestFocus()
+    }
+    fun focusContinuationFromDock() {
+        focus.restoration?.cancel()
+        if (!pageReduced) {
+            // Native lazy focus search can place the previous row without scrolling
+            // to it first. Foundation then owns the focused card's entire reveal.
+            focus.enteringContinuationFromDock = true
+            val moved = try {
+                focusManager.moveFocus(FocusDirection.Up)
+            } finally {
+                focus.enteringContinuationFromDock = false
+            }
+            if (moved) return
+        }
+        // Keep the bounded, cancellable path when the remembered card is unavailable.
+        focus.restoration = scope.launch { focusContent() }
     }
     fun contentUp() {
         focus.restoration?.cancel()
@@ -251,36 +391,38 @@ fun HomeScreen(
         }
     }
     fun selectId(id: String) {
+        if (covered.value || !homeWindowInfo.isWindowFocused) return
         lastContent = null
         control = null
         selected.value = id
         previousIndex = orderedIds.indexOf(id)
-        traceHomeFocus(previousIndex)
+        traceHomeFocus(previousIndex, id)
         if (favoriteApps.any { it.id == id }) lastDock = id
+        if (remaining.any { it.id == id && it is CatalogEntry.App }) lastCatalog = id
+        if (remaining.any { it.id == id && it is CatalogEntry.Folder }) lastFolder = id
     }
     fun select(app: TvApp) = selectId(app.id)
-    LaunchedEffect(selected.value, state.apps) {
-        previewPackage = null
-        delay(M.PREVIEW_DELAY_MILLIS)
-        val app = state.apps.firstOrNull { it.id == selected.value }
-        previewPackage = app?.packageName
+    SettledHomeSelection(selected, state.apps, backgroundOnly) { app ->
+        if (appPreviewsEnabled) previewPackage = app?.packageName
         onSelected(app)
     }
     val restoration =
-        remember(orderedIds, favoriteIds, state.loading, state.failed, resume) {
+        remember(orderedIds, favoriteIds, state.loading, state.failed, resume, backgroundOnly, homeWindowFocused) {
             selected.value?.takeIf { it in orderedIds }
                 ?: orderedIds.getOrNull(
                     previousIndex.coerceIn(0, (orderedIds.size - 1).coerceAtLeast(0)),
                 )
         }
-    val restoreControl = remember(orderedIds, favoriteIds, state.loading, state.failed, resume) { control }
-    LaunchedEffect(orderedIds, favoriteIds, state.loading, state.failed, resume) {
+    val restoreControl =
+        remember(orderedIds, favoriteIds, state.loading, state.failed, resume, backgroundOnly, homeWindowFocused) { control }
+    LaunchedEffect(orderedIds, favoriteIds, state.loading, state.failed, resume, backgroundOnly, homeWindowFocused) {
         focus.restoration?.cancel()
-        if (state.loading) return@LaunchedEffect
+        if (state.loading || backgroundOnly || !homeWindowFocused) return@LaunchedEffect
         if (restoreControl != null) {
             parkDock(animated = false)
             withFrameNanos {}
             when (restoreControl) {
+                "overview" -> if (HomeControl.OVERVIEW in controls) focus.overview else focus.commands
                 "commands" -> focus.commands
                 "avatar" -> focus.avatar
                 "search" -> focus.search
@@ -296,10 +438,12 @@ fun HomeScreen(
             focus.commands.requestFocus()
         }
     }
-    LaunchedEffect(contentIds) {
+    LaunchedEffect(contentIds, backgroundOnly) {
         // Settled app previews change below the dock without resetting native app focus.
         // Only a focused content row needs restoration when its actual entries change.
-        if (lastContent != null && !state.loading) {
+        if (restoreControl == null && control == null && lastContent != null && !state.loading && !covered.value &&
+            homeWindowInfo.isWindowFocused
+        ) {
             focus.restoration?.cancel()
             if (shownContent.isNotEmpty()) {
                 focusContent()
@@ -310,10 +454,67 @@ fun HomeScreen(
             }
         }
     }
-    BackHandler {}
-    BackHandler(lastContent != null) { contentUp() }
-    BackHandler(editingApps) { editingApps = false }
-    BackHandler(movingFavorite != null) { if (!moveSaving) onCancelMove() }
+    LaunchedEffect(homeWindowFocused, overviewOpen, peekFolderId, pendingSection, overviewReturn, peekReturn) {
+        if (!homeWindowFocused || overviewOpen || peekFolderId != null) return@LaunchedEffect
+        withFrameNanos {}
+        val section = pendingSection
+        when {
+            section != null -> {
+                control = null
+                focus.restoration?.cancel()
+                when (section) {
+                    HomeSection.CONTINUATION -> {
+                        focus.grid.scrollToItem(if (heroContent) 0 else 2)
+                        focusContent()
+                    }
+
+                    HomeSection.FAVORITES -> {
+                        focus.grid.scrollToItem(1)
+                        val id = favoriteApps.firstOrNull { it.id == lastDock }?.id ?: favoriteApps.firstOrNull()?.id
+                        if (id != null) focusApp(id) else focusEmptyDock()
+                    }
+
+                    HomeSection.FOLDERS, HomeSection.APPS -> {
+                        val candidates = remaining.filter {
+                            if (section == HomeSection.FOLDERS) it is CatalogEntry.Folder else it is CatalogEntry.App
+                        }
+                        val remembered = if (section == HomeSection.FOLDERS) lastFolder else lastCatalog
+                        val id = candidates.firstOrNull { it.id == remembered }?.id ?: candidates.firstOrNull()?.id
+                        if (id != null) {
+                            focus.grid.scrollToItem(base + remaining.indexOfFirst { it.id == id }.coerceAtLeast(0))
+                            focusApp(id)
+                        } else {
+                            focus.overview.requestFocus()
+                        }
+                    }
+                }
+                pendingSection = null
+            }
+
+            overviewReturn -> {
+                focus.overview.requestFocus()
+                overviewReturn = false
+            }
+
+            peekReturn != null -> {
+                val id = peekReturn
+                peekReturn = null
+                id?.let { focusApp(it) }
+            }
+        }
+    }
+    LaunchedEffect(peekFolderId, folders) {
+        val id = peekFolderId
+        if (id != null && folders.none { it.id == id }) {
+            peekFolderId = null
+            peekReturn = selected.value ?: orderedIds.firstOrNull()
+        }
+    }
+    BackHandler(!backgroundOnly) {}
+    val contentActive by remember { derivedStateOf { lastContent != null } }
+    BackHandler(contentActive && !backgroundOnly) { contentUp() }
+    BackHandler(editingApps && !backgroundOnly) { editingApps = false }
+    BackHandler(movingFavorite != null && !backgroundOnly) { if (!moveSaving) onCancelMove() }
     val moveDirection =
         if (
             androidx.compose.ui.platform.LocalLayoutDirection.current ==
@@ -325,7 +526,11 @@ fun HomeScreen(
         }
     Box(
         Modifier.fillMaxSize()
+            .focusProperties { canFocus = !backgroundOnly }
+            .graphicsLayer { alpha = if (backgroundOnly) 0f else 1f }
+            .then(if (backgroundOnly) Modifier.clearAndSetSemantics {} else Modifier)
             .onPreviewKeyEvent {
+                traceHomeKey(it.nativeKeyEvent, homeWindowInfo.isWindowFocused, covered.value, homeInputMode)
                 if (
                     movingFavorite != null &&
                     it.key in
@@ -355,8 +560,21 @@ fun HomeScreen(
                     }
                     return@onPreviewKeyEvent true
                 }
+                if (it.key in listOf(Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown)) {
+                    if (it.type == KeyEventType.KeyDown) {
+                        fastNavigation = it.nativeKeyEvent.repeatCount > 0
+                        focus.navigationSettlement?.cancel()
+                        focus.navigationSettlement = scope.launch {
+                            delay(180)
+                            fastNavigation = false
+                        }
+                    } else if (it.type == KeyEventType.KeyUp) {
+                        focus.navigationSettlement?.cancel()
+                        fastNavigation = false
+                    }
+                }
                 if (it.type == KeyEventType.KeyDown) {
-                    focus.navigation.direction =
+                    val direction =
                         when (it.key) {
                             Key.DirectionLeft -> Offset(-1f, 0f)
                             Key.DirectionRight -> Offset(1f, 0f)
@@ -364,12 +582,36 @@ fun HomeScreen(
                             Key.DirectionDown -> Offset(0f, 1f)
                             else -> Offset.Zero
                         }
+                    if (direction.y != 0f && focus.navigation.direction.y == -direction.y) {
+                        focus.pageReturnMotion.reset()
+                        // Cancel both the old scroll and its deferred focus request before
+                        // the newly pressed direction reaches the currently focused control.
+                        focus.restoration?.cancel()
+                        if (direction.y < 0f && control != null) {
+                            focus.navigation.direction = direction
+                            focus.restoration = scope.launch { parkDock() }
+                            return@onPreviewKeyEvent true
+                        }
+                    }
+                    focus.navigation.direction = direction
                 }
                 false
             }
             .semantics { testTagsAsResourceId = true },
     ) {
+        Box(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().height(112.dp).zIndex(3f)
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = .24f), Color.Transparent),
+                    ),
+                ),
+        )
         HomeHeader(
+            onOverview = {
+                focus.restoration?.cancel()
+                overviewOpen = true
+            },
             loading = state.loading,
             profile = profile,
             reduced = reduced,
@@ -377,8 +619,10 @@ fun HomeScreen(
             focus = focus,
             onAction = onAction,
             onFocused = { target ->
-                if (!state.loading) {
+                if (!state.loading && !covered.value && homeWindowInfo.isWindowFocused) {
+                    lastContent = null
                     control = when (target) {
+                        HomeControl.OVERVIEW -> "overview"
                         HomeControl.SEARCH -> "search"
                         HomeControl.PROFILES -> "avatar"
                         else -> "commands"
@@ -394,11 +638,14 @@ fun HomeScreen(
                 }
             },
             onDown = {
-                control = null
+                // Keep the actual header identity until a card receives focus. A reversal
+                // during its reveal must still be handled as header navigation.
                 focus.restoration?.cancel()
                 focus.restoration = scope.launch {
                     val id = favoriteApps.firstOrNull { it.id == lastDock }?.id ?: favoriteApps.firstOrNull()?.id
-                    if (id != null) {
+                    if (heroContent) {
+                        focusContent()
+                    } else if (id != null) {
                         focusApp(id, animated = true)
                     } else if (state.apps.isEmpty()) {
                         withFrameNanos {}
@@ -410,20 +657,44 @@ fun HomeScreen(
             },
             modifier = Modifier.align(Alignment.TopEnd).zIndex(4f).padding(horizontal = 32.dp, vertical = 12.dp),
         )
-        HomeClock(Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 24.dp).zIndex(4f))
+        if (!backgroundOnly) {
+            HomeClock(Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 24.dp).zIndex(4f))
+        }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             var dockHeight by remember { mutableStateOf(140.dp) }
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val heroHeight = (maxHeight - 96.dp - dockHeight - 32.dp - 28.dp).coerceAtLeast(0.dp)
-            val tileWidth = ((maxWidth - 96.dp - 100.dp) / 6).coerceAtLeast(120.dp)
-            val safeTop = with(density) { 96.dp.toPx() }
+            val topInset = if (heroContent) 64.dp else 96.dp
+            val bottomInset = if (heroContent) 20.dp else 32.dp
+            val heroHeight = (maxHeight - topInset - dockHeight - bottomInset - 28.dp).coerceAtLeast(0.dp)
+            val continuationViewportWidth = maxWidth
+            val continuationWidth = (maxWidth - 104.dp - 56.dp - 48.dp) / 2
+            val tileWidth = ((maxWidth - 104.dp - 100.dp) / MAX_DOCK_FAVORITES).coerceAtLeast(1.dp)
+            // Requests have their final bounded size during lazy precomposition, before layout.
+            val dockArtworkSize = with(density) {
+                val width = tileWidth.roundToPx()
+                homeArtworkSize(IntSize(width, (width * 9f / 16).toInt()))
+            }
+            val gridArtworkSize = with(density) {
+                homeGridArtworkSize(
+                    constraints.maxWidth - 52.dp.roundToPx() * 2,
+                    tileWidth.roundToPx(),
+                    20.dp.roundToPx(),
+                )
+            }
+            val focusMargin = with(density) { 32.dp.toPx() }
             val minimumScroll =
-                remember(safeTop) {
+                remember(focusMargin, pageReduced) {
                     object : BringIntoViewSpec {
+                        override val scrollAnimationSpec = if (pageReduced) {
+                            super.scrollAnimationSpec
+                        } else {
+                            spring<Float>(dampingRatio = 1f, stiffness = 180f)
+                        }
+
                         override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-                            val margin = 20f
+                            val margin = focusMargin
                             return when {
-                                offset < safeTop -> offset - safeTop
+                                offset < margin -> offset - margin
 
                                 offset + size > containerSize - margin ->
                                     offset + size - containerSize + margin
@@ -433,17 +704,37 @@ fun HomeScreen(
                         }
                     }
                 }
-            CompositionLocalProvider(LocalBringIntoViewSpec provides minimumScroll) {
+            CompositionLocalProvider(
+                LocalBringIntoViewSpec provides minimumScroll,
+                fr.deuspheara.oree.core.designsystem.artwork.LocalFastNavigation provides fastNavigation,
+            ) {
                 LazyVerticalGrid(
-                    GridCells.Adaptive(tileWidth),
+                    GridCells.Fixed(MAX_DOCK_FAVORITES),
                     state = focus.grid,
                     modifier =
                         Modifier.fillMaxSize()
-                            .graphicsLayer { alpha = if (hideCards) 0f else 1f }
+                            .focusProperties {
+                                onExit = {
+                                    // A missing lazy target must use the existing fallback,
+                                    // not let this one Up skip continuation for the header.
+                                    if (focus.enteringContinuationFromDock) cancelFocusChange()
+                                }
+                            }
+                            .graphicsLayer {
+                                alpha = if (hideCards) {
+                                    0f
+                                } else if (overviewOpen) {
+                                    .55f
+                                } else {
+                                    1f
+                                }
+                                scaleX = overviewScale.value
+                                scaleY = overviewScale.value
+                            }
                             .then(if (hideCards) Modifier.clearAndSetSemantics {} else Modifier)
                             .testTag("home"),
                     contentPadding =
-                        PaddingValues(start = 32.dp, end = 32.dp, top = 96.dp, bottom = 32.dp),
+                        PaddingValues(start = 52.dp, end = 52.dp, top = topInset, bottom = bottomInset),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalArrangement = Arrangement.spacedBy(28.dp),
                 ) {
@@ -452,7 +743,46 @@ fun HomeScreen(
                         span = { GridItemSpan(maxLineSpan) },
                         contentType = "space",
                     ) {
-                        Box(Modifier.height(heroHeight).fillMaxWidth()) {
+                        Box(Modifier.height(heroHeight).fillMaxWidth().onSizeChanged { focus.contextHeightPx = it.height }) {
+                            if (heroContent) {
+                                val largeWidth = minOf(
+                                    continuationWidth,
+                                    (heroHeight - 80.dp - 44.dp * density.fontScale).coerceAtLeast(72.dp) * (16f / 9f),
+                                )
+                                HomeContinuationRow(
+                                    shownContent, state.apps, focus,
+                                    stringResource(
+                                        if (shownContent.any {
+                                                it.provider == ContentSourceId.WATCH_NEXT
+                                            }
+                                        ) {
+                                            R.string.continue_watching
+                                        } else {
+                                            R.string.watch_next_title
+                                        },
+                                    ),
+                                    largeWidth, true, reduced,
+                                    viewportWidth = continuationViewportWidth,
+                                    onFocus = {
+                                        if (!covered.value && homeWindowInfo.isWindowFocused) {
+                                            traceHomeContentFocus(shownContent, it.id)
+                                            control = null
+                                            lastContent = it.id
+                                            rememberedContent = it.id
+                                        }
+                                    },
+                                    onOpen = onOpenContent,
+                                    onUp = ::focusHeader,
+                                    onDown = ::contentUp,
+                                    onEnterFromBelow = {
+                                        val entry = shownContent.firstOrNull { it.id == (lastContent ?: rememberedContent) }
+                                            ?: shownContent.firstOrNull()
+                                        entry?.let { focus.contentRequesters[it.id]?.requestFocus() } == true
+                                    },
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                )
+                            }
+
                             if (movingFavorite != null) {
                                 Column(
                                     Modifier.align(Alignment.BottomCenter)
@@ -496,35 +826,14 @@ fun HomeScreen(
                     }
                     item(key = "dock", span = { GridItemSpan(maxLineSpan) }, contentType = "dock") {
                         Box(
-                            Modifier.fillMaxWidth()
+                            Modifier.requiredWidth(maxWidth - 64.dp)
                                 .onGloballyPositioned {
                                     dockHeight = with(density) { it.size.height.toDp() }
                                 }
                                 .clip(RoundedCornerShape(30.dp))
                                 .testTag("favorites-dock"),
                         ) {
-                            if (retainDock) {
-                                RetainedMenuSurface(
-                                    sourceKey,
-                                    reduced,
-                                    Modifier.matchParentSize(),
-                                    role = GlassSurfaceRole.CONTROL,
-                                    radius = 30.dp,
-                                    treatment = GlassTreatment.CLEAR,
-                                    performanceMode =
-                                        dev.chrisbanes.haze.HazePerformanceMode.Performance,
-                                )
-                            } else {
-                                Box(
-                                    Modifier.matchParentSize()
-                                        .glassSurface(
-                                            radius = 30.dp,
-                                            treatment = GlassTreatment.CLEAR,
-                                            performanceMode =
-                                                dev.chrisbanes.haze.HazePerformanceMode.Performance,
-                                        ),
-                                )
-                            }
+                            DockSurface(Modifier.matchParentSize())
                             if (favoriteApps.isEmpty()) {
                                 Row(
                                     Modifier.padding(24.dp).heightIn(min = 100.dp),
@@ -582,6 +891,7 @@ fun HomeScreen(
                                 ) {
                                     LazyRow(
                                         state = focus.dock,
+                                        userScrollEnabled = false,
                                         contentPadding =
                                             PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                                         horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -625,7 +935,8 @@ fun HomeScreen(
                                                         index == favoriteApps.lastIndex,
                                                     ),
                                                     focus.navigation,
-                                                    loadingVisible = !hideCards,
+                                                    loadingVisible = !hideCards && !backgroundOnly,
+                                                    preparedArtworkSize = dockArtworkSize,
                                                     onFocus = { select(app) },
                                                     onClick = { bounds ->
                                                         select(app)
@@ -642,8 +953,7 @@ fun HomeScreen(
                                                                 cb(app, bounds, true)
                                                             }
                                                         },
-                                                    onUp = ::focusHeader,
-                                                    freshUpOnly = true,
+                                                    onUp = if (heroContent) ::focusContinuationFromDock else ::focusHeader,
                                                 )
                                             }
                                         }
@@ -652,82 +962,29 @@ fun HomeScreen(
                             }
                         }
                     }
-                    if (shownContent.isNotEmpty()) {
-                        item(
-                            key = "watch-next",
-                            span = { GridItemSpan(maxLineSpan) },
-                            contentType = "content",
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    if (appPreviewsEnabled) {
-                                        stringResource(
-                                            R.string.app_previews_from,
-                                            state.apps
-                                                .firstOrNull { it.packageName == previewPackage }
-                                                ?.label
-                                                .orEmpty(),
-                                        )
-                                    } else {
-                                        stringResource(R.string.watch_next_title)
-                                    },
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                )
-                                LazyRow(
-                                    state = focus.contentRow,
-                                    contentPadding = PaddingValues(12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                                    modifier = Modifier.testTag("watch-next-row"),
-                                ) {
-                                    itemsIndexed(
-                                        shownContent,
-                                        key = { _, entry -> entry.id },
-                                        contentType = { _, _ -> "content" },
-                                    ) { index, entry ->
-                                        val requester = remember(entry.id) { FocusRequester() }
-                                        DisposableEffect(entry.id) {
-                                            focus.contentRequesters[entry.id] = requester
-                                            onDispose { focus.contentRequesters.remove(entry.id) }
-                                        }
-                                        ContentCard(
-                                            entry,
-                                            state.apps.firstOrNull {
-                                                it.packageName == entry.source
-                                            },
-                                            reduced,
-                                            Modifier.width(tileWidth)
-                                                .focusRequester(requester)
-                                                .focusProperties {
-                                                    start =
-                                                        if (index == 0) {
-                                                            FocusRequester.Cancel
-                                                        } else {
-                                                            FocusRequester.Default
-                                                        }
-                                                    end =
-                                                        if (index == shownContent.lastIndex) {
-                                                            FocusRequester.Cancel
-                                                        } else {
-                                                            FocusRequester.Default
-                                                        }
-                                                },
-                                            onFocus = {
-                                                control = null
-                                                lastContent = entry.id
-                                            },
-                                            onClick = { onOpenContent(entry) },
-                                            onUp = ::contentUp,
-                                            onDown = {
-                                                focus.restoration?.cancel()
-                                                focus.restoration = scope.launch {
-                                                    remaining.firstOrNull()?.let { focusApp(it.id) }
-                                                }
-                                            },
-                                        )
+                    if (rowContent) {
+                        item(key = "watch-next", span = { GridItemSpan(maxLineSpan) }, contentType = "content") {
+                            HomeContinuationRow(
+                                shownContent, state.apps, focus,
+                                stringResource(R.string.watch_next_title), tileWidth, false, reduced,
+                                viewportWidth = continuationViewportWidth,
+                                onFocus = {
+                                    if (!covered.value && homeWindowInfo.isWindowFocused) {
+                                        traceHomeContentFocus(shownContent, it.id)
+                                        control = null
+                                        lastContent = it.id
+                                        rememberedContent = it.id
                                     }
-                                }
-                            }
+                                },
+                                onOpen = onOpenContent,
+                                onUp = ::contentUp,
+                                onDown = {
+                                    focus.restoration?.cancel()
+                                    focus.restoration = scope.launch {
+                                        remaining.firstOrNull()?.let { focusApp(it.id, animated = true) }
+                                    }
+                                },
+                            )
                         }
                     }
                     if (statusRow) {
@@ -783,7 +1040,7 @@ fun HomeScreen(
                                 {
                                     focus.restoration?.cancel()
                                     focus.restoration = scope.launch {
-                                        if (shownContent.isNotEmpty()) {
+                                        if (rowContent) {
                                             focusContent()
                                         } else if (favoriteApps.isNotEmpty()) {
                                             focusApp(
@@ -807,7 +1064,8 @@ fun HomeScreen(
                                     reduced,
                                     slot,
                                     focus.navigation,
-                                    loadingVisible = !hideCards,
+                                    loadingVisible = !hideCards && !backgroundOnly,
+                                    preparedArtworkSize = gridArtworkSize,
                                     onFocus = { select(item.app) },
                                     onClick = { bounds ->
                                         select(item.app)
@@ -840,19 +1098,151 @@ fun HomeScreen(
                                         onFolder(item.folder.id)
                                     },
                                     onUp = up,
+                                    onPeek = {
+                                        selectId(item.id)
+                                        peekFolderId = item.folder.id
+                                    },
+                                    onManage = {
+                                        selectId(item.id)
+                                        onAction(HomeAction.OpenFolder(item.folder.id, manage = true))
+                                    },
                                 )
                         }
                     }
                 }
             }
         }
+        val selectedFolder by remember(folders) { derivedStateOf { folders.firstOrNull { it.homeId == selected.value } } }
+        val focusedFolder = selectedFolder?.takeIf {
+            control == null && !contentActive && !hideCards && !backgroundOnly && !overviewOpen && peekFolderId == null
+        }
+        if (focusedFolder != null) {
+            key(focusedFolder.id) {
+                FolderQuickPreview(
+                    focusedFolder,
+                    state.apps,
+                    reduced,
+                    Modifier.align(Alignment.BottomEnd).padding(end = 52.dp, bottom = 24.dp),
+                )
+            }
+        }
+        val moreBelow by remember { derivedStateOf { focus.grid.canScrollForward } }
+        if (moreBelow && remaining.isNotEmpty() && !overviewOpen && peekFolderId == null && !hideCards && !backgroundOnly) {
+            Text(
+                stringResource(R.string.home_more_below),
+                color = Color.White,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
+                    .background(Color.Black.copy(alpha = .45f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 2.dp).testTag("home-more-below"),
+                fontSize = 12.sp,
+            )
+        }
+        if (overviewOpen) {
+            HomeOverview(
+                buildMap {
+                    if (shownContent.isNotEmpty()) put(HomeSection.CONTINUATION, shownContent.size)
+                    if (favoriteApps.isNotEmpty()) put(HomeSection.FAVORITES, favoriteApps.size)
+                    if (folders.isNotEmpty()) put(HomeSection.FOLDERS, folders.size)
+                    if (projection.catalog.isNotEmpty()) put(HomeSection.APPS, projection.catalog.size)
+                },
+                reduced,
+                sourceKey,
+                onSelect = { section ->
+                    overviewOpen = false
+                    pendingSection = section
+                },
+                onClose = {
+                    overviewOpen = false
+                    overviewReturn = true
+                },
+            )
+        }
+        val peekFolder = folders.firstOrNull { it.id == peekFolderId }
+        if (peekFolder != null) {
+            FolderPeek(
+                peekFolder,
+                state.apps,
+                focus,
+                reduced,
+                sourceKey,
+                onOpen,
+                onOpenFolder = {
+                    peekFolderId = null
+                    onFolder(peekFolder.id)
+                },
+                onManage = {
+                    peekFolderId = null
+                    onAction(HomeAction.OpenFolder(peekFolder.id, manage = true))
+                },
+                onClose = {
+                    peekFolderId = null
+                    peekReturn = peekFolder.homeId
+                },
+            )
+        }
     }
 }
 
 /** Trace-only logical destinations; no app labels, persistent logs, or frame-loop work. */
-private fun traceHomeFocus(index: Int) {
+private fun traceHomeFocus(index: Int, id: String? = null) {
     if (android.os.Build.VERSION.SDK_INT >= 29 && android.os.Trace.isEnabled()) {
         android.os.Trace.beginSection("TVL:focus:$index")
         android.os.Trace.endSection()
+        if (id != null) traceHomeIdentity("app", id)
+    }
+}
+
+/** Event timestamps are Android uptime; Perfetto provides their trace-clock observations. */
+private fun traceHomeKey(
+    event: android.view.KeyEvent,
+    windowFocused: Boolean,
+    covered: Boolean,
+    inputMode: androidx.compose.ui.input.InputModeManager,
+) {
+    if (android.os.Build.VERSION.SDK_INT >= 29 && android.os.Trace.isEnabled()) {
+        android.os.Trace.beginSection(
+            "TVL:key:${event.eventTime}:${event.downTime}:${event.action}:${event.keyCode}:${event.repeatCount}" +
+                ":flags=${event.flags}:source=${event.source}:window=$windowFocused:covered=$covered:mode=${inputMode.inputMode}",
+        )
+        android.os.Trace.endSection()
+    }
+}
+
+private fun traceHomeContentFocus(entries: List<ContentEntry>, id: String) {
+    if (android.os.Build.VERSION.SDK_INT >= 29 && android.os.Trace.isEnabled()) {
+        android.os.Trace.beginSection("TVL:contentFocus:${entries.indexOfFirst { it.id == id }}")
+        android.os.Trace.endSection()
+        traceHomeIdentity("content", id)
+    }
+}
+
+/** Raw IDs stay in private traces; long IDs use a stable digest to respect Trace's name bound. */
+private fun traceHomeIdentity(kind: String, id: String) {
+    val identity = if (id.length <= 96) {
+        id
+    } else {
+        "sha256:" + android.util.Base64.encodeToString(
+            java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8)),
+            android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
+        )
+    }
+    android.os.Trace.beginSection("TVL:identity:$kind:$identity")
+    android.os.Trace.endSection()
+}
+
+/** Observe only this small effect scope while focus moves; the catalog does not recompose. */
+@Composable
+private fun SettledHomeSelection(
+    selection: androidx.compose.runtime.State<String?>,
+    apps: List<TvApp>,
+    covered: Boolean,
+    onSettled: (TvApp?) -> Unit,
+) {
+    val selected = selection.value
+    val latest by androidx.compose.runtime.rememberUpdatedState(onSettled)
+    LaunchedEffect(selected, apps, covered) {
+        if (covered) return@LaunchedEffect
+        delay(M.PREVIEW_DELAY_MILLIS)
+        latest(apps.firstOrNull { it.id == selected })
     }
 }

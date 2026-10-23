@@ -91,6 +91,7 @@ class AndroidAppCatalogSource(
                     } else {
                         ArtworkKind.ICON
                     },
+                    icon = info.applicationInfo.icon.takeIf { id -> id != 0 } ?: info.icon,
                 )
             }
             .distinctBy { it.id }

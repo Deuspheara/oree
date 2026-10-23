@@ -35,6 +35,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -81,9 +82,12 @@ fun AppContextMenu(
     onMoveToFolder: (() -> Unit)? = null,
     onMoveHome: (() -> Unit)? = null,
     reorderLabel: String? = null,
+    canAddFavorite: Boolean = true,
 ) {
     var confirmUninstall by remember { mutableStateOf(false) }
     val cancelUninstall = remember { FocusRequester() }
+    val uninstall = remember { FocusRequester() }
+    var restoreUninstall by remember { mutableStateOf(false) }
     var awaitingRelease by remember { mutableStateOf(awaitingOpeningRelease) }
     val motion = rememberPanelTransition(reduceMotion)
     fun close(action: () -> Unit = onClose) = motion.close(action)
@@ -233,19 +237,12 @@ fun AppContextMenu(
                                         },
                                     ),
                                 symbol = LauncherSymbol.FAVORITE,
-                                enabled = !saving && !motion.closing,
+                                enabled = !saving && !motion.closing && (favorite || canAddFavorite),
                                 reduced = reduceMotion,
                                 compact = true,
                             )
-                            if (onUninstall != null) {
-                                SettingsRow(
-                                    stringResource(R.string.uninstall_app),
-                                    { confirmUninstall = true },
-                                    Modifier.fillMaxWidth().testTag("menu-uninstall"),
-                                    enabled = !saving && !motion.closing,
-                                    reduced = reduceMotion,
-                                    compact = true,
-                                )
+                            if (!favorite && !canAddFavorite) {
+                                Text(stringResource(R.string.dock_full), color = D.secondary, modifier = Modifier.padding(12.dp))
                             }
                             if (onReorder != null) {
                                 SettingsRow(
@@ -287,6 +284,19 @@ fun AppContextMenu(
                                     compact = true,
                                 )
                             }
+                            if (onUninstall != null) {
+                                SettingsRow(
+                                    stringResource(R.string.uninstall_app),
+                                    {
+                                        restoreUninstall = true
+                                        confirmUninstall = true
+                                    },
+                                    Modifier.fillMaxWidth().focusRequester(uninstall).testTag("menu-uninstall"),
+                                    enabled = !saving && !motion.closing,
+                                    reduced = reduceMotion,
+                                    compact = true,
+                                )
+                            }
                             if (failed) {
                                 Text(
                                     stringResource(R.string.organization_write_error),
@@ -307,9 +317,16 @@ fun AppContextMenu(
                 }
             }
         }
-        LaunchedEffect(confirmUninstall) {
-            withFrameNanos {}
-            if (confirmUninstall) cancelUninstall.requestFocus() else first.requestFocus()
+        val ready = LocalWindowInfo.current.isWindowFocused
+        LaunchedEffect(confirmUninstall, ready) {
+            if (ready) {
+                withFrameNanos {}
+                when {
+                    confirmUninstall -> cancelUninstall.requestFocus()
+                    restoreUninstall && onUninstall != null -> uninstall.requestFocus()
+                    else -> first.requestFocus()
+                }
+            }
         }
     }
 }

@@ -1,0 +1,25 @@
+# CPU/input attribution only. gfx is intentionally excluded because this TV's gfx category
+# expands to unavailable vendor display/GPU events. Use trace-config.pbtxt separately for
+# HWUI/Skia diagnostics, retaining and disclosing its unsupported-event report.
+buffers { size_kb: 65536 fill_policy: RING_BUFFER }
+duration_ms: 30000
+data_sources {
+ config {
+  name: "linux.ftrace"
+  ftrace_config {
+   ftrace_events: "sched/sched_switch"
+   ftrace_events: "sched/sched_wakeup"
+   ftrace_events: "task/task_newtask"
+   ftrace_events: "task/task_rename"
+   ftrace_events: "power/cpu_frequency"
+   atrace_categories: "input"
+   atrace_categories: "view"
+   atrace_categories: "wm"
+   atrace_categories: "am"
+   atrace_categories: "dalvik"
+   atrace_apps: "fr.deuspheara.oree"
+  }
+ }
+}
+data_sources { config { name: "linux.process_stats" process_stats_config { scan_all_processes_on_start: true proc_stats_poll_ms: 1000 } } }
+data_sources { config { name: "android.surfaceflinger.frametimeline" } }

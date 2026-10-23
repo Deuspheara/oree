@@ -25,6 +25,8 @@ enum class CatalogSort {
     RECENT,
 }
 
+enum class HomeContentLayout { BELOW_DOCK, ABOVE_DOCK }
+
 /** Small, bounded preferences. Layout/profile relations have separate ownership. */
 data class LauncherPreferences(
     val theme: ThemeMode = ThemeMode.DARK,
@@ -41,8 +43,14 @@ data class LauncherPreferences(
     val accent: AccentColor = AccentColor.BLUE,
     val controls: Map<ControlId, ControlSize> = emptyMap(),
     val controlPositions: Map<ControlId, ControlPosition> = emptyMap(),
+    val homeContentLayout: HomeContentLayout = HomeContentLayout.BELOW_DOCK,
+    val backdropBlur: Float = 1f,
+    val motionIntensity: Float = 1f,
+    val setupComplete: Boolean = false,
 ) {
     fun normalized(): LauncherPreferences = copy(
+        motionIntensity = if (motionIntensity.isFinite()) motionIntensity.coerceIn(0f, 1f) else 1f,
+        backdropBlur = if (backdropBlur.isFinite()) backdropBlur.coerceIn(0f, 1f) else 1f,
         controlPositions =
             controlPositions.mapValues { (id, position) ->
                 position.normalized(controls[id] ?: defaultControlSize(id))

@@ -29,3 +29,14 @@ fun providerChanges(context: Context, uri: Uri, io: kotlinx.coroutines.Coroutine
 }
     .conflate()
     .flowOn(io)
+
+/** Only public provider artwork; remote sources are opt-in, HTTPS, without embedded credentials. */
+internal fun contentArtworkUri(raw: String?): String? {
+    if (raw.isNullOrBlank() || raw.length > 4096 || raw.any(Char::isISOControl)) return null
+    val uri = Uri.parse(raw)
+    return when (uri.scheme) {
+        "content", "android.resource" -> raw.takeIf { !uri.authority.isNullOrBlank() }
+        "https" -> raw.takeIf { !uri.host.isNullOrBlank() && uri.userInfo == null }
+        else -> null
+    }
+}

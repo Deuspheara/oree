@@ -20,8 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import fr.deuspheara.oree.core.model.LocalPhoto
 import fr.deuspheara.oree.core.model.LocalPhotos
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
 // Only returns permission names. The explicit SDK parameter keeps API boundary tests deterministic.
@@ -49,6 +49,7 @@ fun PhotoGalleryPanel(
     requestOnOpen: Boolean = true,
     loadPhotos: suspend () -> LocalPhotos,
     sourceKey: Any? = null,
+    onPreview: ((LocalPhoto) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val permissions = remember { photoReadPermissions(Build.VERSION.SDK_INT) }
@@ -75,8 +76,6 @@ fun PhotoGalleryPanel(
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             snapshotFlow { epoch }
                 .collectLatest {
-                    // Coalesce resume and permission callbacks before starting bounded IO.
-                    delay(100)
                     permitted = hasAccess()
                     photos =
                         if (permitted) {
@@ -92,6 +91,6 @@ fun PhotoGalleryPanel(
         permitted && Build.VERSION.SDK_INT >= 34 &&
             context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED,
         reduced, saving, failed, { onChoose(android.net.Uri.parse(it)) }, onSystemPicker, onClose,
-        { request.launch(permissions) }, { epoch++ }, sourceKey,
+        { request.launch(permissions) }, { epoch++ }, sourceKey, onPreview,
     )
 }

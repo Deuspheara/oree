@@ -1,0 +1,21 @@
+# CPU/input/FrameTimeline only; no vendor GPU, power-rail or unrelated data sources.
+buffers { size_kb: 65536 fill_policy: RING_BUFFER }
+data_sources {
+ config {
+  name: "linux.ftrace"
+  ftrace_config {
+   ftrace_events: "sched/sched_switch"
+   ftrace_events: "sched/sched_wakeup"
+   ftrace_events: "power/cpu_frequency"
+   atrace_categories: "input"
+   atrace_categories: "view"
+   atrace_categories: "wm"
+   atrace_categories: "am"
+   atrace_categories: "dalvik"
+   atrace_apps: "fr.deuspheara.oree"
+   atrace_apps: "fr.deuspheara.oree.benchmark"
+  }
+ }
+}
+data_sources { config { name: "linux.process_stats" process_stats_config { scan_all_processes_on_start: true } } }
+data_sources { config { name: "android.surfaceflinger.frametimeline" } }

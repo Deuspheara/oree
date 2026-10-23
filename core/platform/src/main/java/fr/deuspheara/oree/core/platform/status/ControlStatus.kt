@@ -1,12 +1,16 @@
 package fr.deuspheara.oree.core.platform.status
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.channels.awaitClose
@@ -36,6 +40,10 @@ data class ControlStatus(
     val network: NetworkKind = NetworkKind.UNKNOWN,
     val validated: Boolean = false,
     val audio: Set<AudioOutput> = emptySet(),
+    val volume: Int? = null,
+    val maxVolume: Int? = null,
+    val volumeFixed: Boolean = true,
+    val muted: Boolean = false,
 )
 
 /** Registered only while collected by the visible, STARTED command panel. No polling or traffic. */
@@ -99,7 +107,13 @@ fun controlStatus(context: Context) = callbackFlow {
                 .orEmpty()
         }
             .getOrDefault(emptySet())
-        current = current.copy(audio = outputs)
+        current = current.copy(
+            audio = outputs,
+            volume = runCatching { audio?.getStreamVolume(AudioManager.STREAM_MUSIC) }.getOrNull(),
+            maxVolume = runCatching { audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }.getOrNull(),
+            volumeFixed = runCatching { audio?.isVolumeFixed ?: true }.getOrDefault(true),
+            muted = runCatching { audio?.isStreamMute(AudioManager.STREAM_MUSIC) == true }.getOrDefault(false),
+        )
         trySend(current)
     }
     val networkCallback =
@@ -114,10 +128,29 @@ fun controlStatus(context: Context) = callbackFlow {
 
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = publishAudio()
         }
+    // Firmware volume broadcasts are invalidations only; never trust supplied values.
+    val volumeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            publishAudio()
+        }
+    }
+    var volumeRegistered = false
     var networkRegistered = false
     var audioRegistered = false
     val start = Runnable {
         publishAudio()
+        try {
+            val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION").apply {
+                addAction("android.media.STREAM_MUTE_CHANGED_ACTION")
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(volumeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                context.registerReceiver(volumeReceiver, filter)
+            }
+            volumeRegistered = true
+        } catch (_: RuntimeException) {}
         try {
             publishNetwork(connectivity?.getNetworkCapabilities(connectivity.activeNetwork))
             connectivity?.registerDefaultNetworkCallback(networkCallback, handler)
@@ -139,6 +172,7 @@ fun controlStatus(context: Context) = callbackFlow {
     awaitClose {
         handler.removeCallbacks(start)
         handler.post {
+            if (volumeRegistered) runCatching { context.unregisterReceiver(volumeReceiver) }
             if (networkRegistered) {
                 runCatching { connectivity?.unregisterNetworkCallback(networkCallback) }
             }

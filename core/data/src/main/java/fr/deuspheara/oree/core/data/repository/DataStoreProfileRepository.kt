@@ -15,6 +15,7 @@ import fr.deuspheara.oree.core.model.AppOrganization
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.LocalProfile
 import fr.deuspheara.oree.core.model.MAX_APP_FOLDERS
+import fr.deuspheara.oree.core.model.MAX_DOCK_FAVORITES
 import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.core.model.WallpaperMode
 import fr.deuspheara.oree.core.model.setFavoriteApp
@@ -176,6 +177,9 @@ constructor(
     override suspend fun setPreferences(id: String, value: LauncherPreferences) = update(id) { it.copy(preferences = value.normalized()) }
 
     override suspend fun setFavorite(id: String, component: String, favorite: Boolean) = update(id) {
+        if (favorite && component !in it.favorites && it.favorites.distinct().size >= MAX_DOCK_FAVORITES) {
+            throw IOException("Favorite dock is full")
+        }
         it.copy(
             favorites = setFavoriteApp(it.favorites, component, favorite),
             folders =

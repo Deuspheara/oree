@@ -71,7 +71,7 @@ class MenuFollowupTest {
         InstrumentationRegistry.getInstrumentation()
             .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.waitForIdle()
-        compose.onNodeWithTag("menu-open").assertIsFocused()
+        compose.onNodeWithTag("menu-uninstall").assertIsFocused()
         focus("menu-uninstall").performKeyInput { pressKey(Key.DirectionCenter) }
         focus("uninstall-confirm").performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(1, requests) }

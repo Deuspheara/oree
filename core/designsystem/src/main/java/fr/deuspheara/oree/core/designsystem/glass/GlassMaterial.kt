@@ -3,6 +3,7 @@
 package fr.deuspheara.oree.core.designsystem.glass
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,14 +11,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.copy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -27,6 +32,7 @@ import androidx.compose.ui.unit.isFinite
 import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.GlassStyle
 import dev.chrisbanes.haze.glass.RefractionProfile
@@ -36,7 +42,8 @@ import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
 
 val LocalGlassSource = staticCompositionLocalOf<HazeState?> { null }
 
-val LocalOpaquePanels = staticCompositionLocalOf { false }
+// This policy changes during navigation; invalidate its readers rather than the whole scene.
+val LocalOpaquePanels = compositionLocalOf { false }
 
 val LocalLiquidGlass = staticCompositionLocalOf { true }
 val LocalGlassIntensity = staticCompositionLocalOf { .75f }
@@ -44,12 +51,34 @@ val LocalGlassIntensity = staticCompositionLocalOf { .75f }
 val LocalReducedTransparency = staticCompositionLocalOf { false }
 
 @Composable
-fun WallpaperBackground(image: ImageBitmap?, reduced: Boolean) {
+fun WallpaperBackground(
+    image: ImageBitmap?,
+    reduced: Boolean,
+    frost: ImageBitmap? = null,
+    softened: Boolean = false,
+    blurAmount: Float = 1f,
+    sampleForGlass: Boolean = true,
+) {
+    val source = LocalGlassSource.current
+    val liquidGlass = LocalLiquidGlass.current
+    val reducedTransparency = LocalReducedTransparency.current
+    val diffusion by animateFloatAsState(
+        if (softened) blurAmount.coerceIn(0f, 1f) else 0f,
+        tween(if (reduced) 0 else 280),
+        label = "wallpaper-depth",
+    )
     Box(
         Modifier.fillMaxSize()
+            .graphicsLayer {
+                compositingStrategy = if (size.width * size.height <= 4_194_304f) {
+                    CompositingStrategy.Offscreen
+                } else {
+                    CompositingStrategy.Auto
+                }
+            }
             .then(
-                LocalGlassSource.current
-                    ?.takeIf { LocalLiquidGlass.current && !LocalReducedTransparency.current }
+                source
+                    ?.takeIf { sampleForGlass && liquidGlass && !reducedTransparency }
                     ?.let { Modifier.hazeSource(it) } ?: Modifier,
             ),
     ) {
@@ -60,6 +89,18 @@ fun WallpaperBackground(image: ImageBitmap?, reduced: Boolean) {
                 Box(Modifier.fillMaxSize().background(DesignTokens.background))
             }
         }
+        if (frost != null) {
+            Image(
+                frost,
+                null,
+                Modifier.fillMaxSize().graphicsLayer { alpha = diffusion },
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Box(
+            Modifier.fillMaxSize().graphicsLayer { alpha = diffusion }
+                .background(Color.Black.copy(alpha = .25f)),
+        )
         Box(
             Modifier.fillMaxSize()
                 .background(
@@ -109,6 +150,7 @@ fun Modifier.glassSurface(
     radius: Dp = 26.dp,
     treatment: GlassTreatment = GlassTreatment.SOFT,
     role: GlassSurfaceRole = GlassSurfaceRole.CONTROL,
+    progressive: HazeProgressive? = null,
     performanceMode: HazePerformanceMode = HazePerformanceMode.Balanced,
 ): Modifier {
     val source = LocalGlassSource.current
@@ -119,7 +161,7 @@ fun Modifier.glassSurface(
     val fallback = usesOpaqueGlass(opaque)
     val lightMenu = DesignTokens.background.luminance() > .5f && role == GlassSurfaceRole.MENU
     val style =
-        remember(shape, intensity, treatment, lightMenu) {
+        remember(shape, intensity, treatment, lightMenu, progressive) {
             GlassStyle.clear.then {
                 shape(shape)
                 backgroundColor(
@@ -133,7 +175,18 @@ fun Modifier.glassSurface(
                     refractionHeightFraction = .35f,
                     refractionDisplacement = 56.dp,
                     blurRadius =
-                        ((if (treatment == GlassTreatment.CLEAR) 1.25f else 8f) * intensity).dp,
+                        (
+                            (
+                                if (treatment == GlassTreatment.CLEAR) {
+                                    1.25f
+                                } else if (progressive != null) {
+                                    16f
+                                } else {
+                                    8f
+                                }
+                                ) * intensity
+                            ).dp,
+                    progressive = progressive,
                     refractionProfile = RefractionProfile.Edge(28.dp),
                     refractionDetailIntensity = 0f,
                 )

@@ -1,5 +1,6 @@
 package fr.deuspheara.oree.core.data.repository
 
+import fr.deuspheara.oree.core.domain.concurrency.AppDispatchers
 import fr.deuspheara.oree.core.domain.source.ContentSource
 import fr.deuspheara.oree.core.model.ContentAvailability
 import fr.deuspheara.oree.core.model.ContentEntry
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -43,7 +45,13 @@ class DefaultContentRepositoryTest {
         repeat(8) { mask ->
             val next = Source(ContentSourceId.WATCH_NEXT)
             val preview = Source(ContentSourceId.PREVIEW)
-            val repository = DefaultContentRepository(next, preview, backgroundScope)
+            val repository =
+                DefaultContentRepository(
+                    next,
+                    preview,
+                    backgroundScope,
+                    AppDispatchers(StandardTestDispatcher(testScheduler), StandardTestDispatcher(testScheduler)),
+                )
             val subscriber = backgroundScope.launch {
                 repository
                     .observe(
@@ -84,7 +92,13 @@ class DefaultContentRepositoryTest {
                     )
             }
         val preview = Source(ContentSourceId.PREVIEW)
-        val repository = DefaultContentRepository(next, preview, backgroundScope)
+        val repository =
+            DefaultContentRepository(
+                next,
+                preview,
+                backgroundScope,
+                AppDispatchers(StandardTestDispatcher(testScheduler), StandardTestDispatcher(testScheduler)),
+            )
         val selected = MutableStateFlow<String?>("target")
         var artwork: String? = null
         val first = backgroundScope.launch {
@@ -127,7 +141,12 @@ class DefaultContentRepositoryTest {
                     )
             }
         val repository =
-            DefaultContentRepository(next, Source(ContentSourceId.PREVIEW), backgroundScope)
+            DefaultContentRepository(
+                next,
+                Source(ContentSourceId.PREVIEW),
+                backgroundScope,
+                AppDispatchers(StandardTestDispatcher(testScheduler), StandardTestDispatcher(testScheduler)),
+            )
         var last = ContentFeed(ContentAvailability.LOADING)
         var wallpaperStatus = ContentAvailability.LOADING
         val subscriber = backgroundScope.launch {
@@ -151,7 +170,13 @@ class DefaultContentRepositoryTest {
     @Test
     fun explicitRetryRefreshesSharedSnapshotWithoutAddingAnObserver() = runTest {
         val source = Source(ContentSourceId.WATCH_NEXT)
-        val repository = DefaultContentRepository(source, Source(ContentSourceId.PREVIEW), backgroundScope)
+        val repository =
+            DefaultContentRepository(
+                source,
+                Source(ContentSourceId.PREVIEW),
+                backgroundScope,
+                AppDispatchers(StandardTestDispatcher(testScheduler), StandardTestDispatcher(testScheduler)),
+            )
         val subscriber = backgroundScope.launch {
             repository.observe(true, false, true, MutableStateFlow(null)).collect()
         }

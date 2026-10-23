@@ -1,5 +1,6 @@
 package fr.deuspheara.oree.core.data.repository
 
+import fr.deuspheara.oree.core.domain.concurrency.AppDispatchers
 import fr.deuspheara.oree.core.domain.repository.ContentRepository
 import fr.deuspheara.oree.core.domain.source.ContentSelection
 import fr.deuspheara.oree.core.domain.source.ContentSource
@@ -7,7 +8,9 @@ import fr.deuspheara.oree.core.domain.source.forPackage
 import fr.deuspheara.oree.core.model.ContentAvailability
 import fr.deuspheara.oree.core.model.ContentFeed
 import fr.deuspheara.oree.core.model.RecentContent
+import fr.deuspheara.oree.core.model.continuationPerApp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +29,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.replay
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.withContext
 
 /**
  * Ref-counted source snapshots: one observer/query pipeline per enabled source, no stop grace
@@ -35,6 +39,7 @@ class DefaultContentRepository(
     private val watchNext: ContentSource,
     private val preview: ContentSource,
     private val scope: CoroutineScope,
+    private val dispatchers: AppDispatchers = AppDispatchers(Dispatchers.IO, Dispatchers.Default),
 ) : ContentRepository {
     private val refreshes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -91,10 +96,10 @@ class DefaultContentRepository(
             }
         return combine(recentFlow, previewFlow, packageName) { next, programs, selectedPackage ->
             val feeds = buildMap {
-                if (watchNextFeed) put(watchNext.id, next.forPackage(null, 20))
-                if (appPreviews) put(preview.id, programs.forPackage(null, 20))
+                if (watchNextFeed) put(watchNext.id, next.forPackage(null, 200))
+                if (appPreviews) put(preview.id, programs.forPackage(null, 200))
             }
-            val entries = feeds.values.flatMap { it.entries }.distinctBy { it.id }.take(40)
+            val entries = feeds.values.flatMap { it.entries }.distinctBy { it.id }.take(400)
             val availability =
                 if (entries.isNotEmpty()) {
                     ContentAvailability.AVAILABLE
@@ -119,17 +124,20 @@ class DefaultContentRepository(
                 if (wallpaper) {
                     val filtered = next.forPackage(selectedPackage, 1)
                     filtered.entries.firstOrNull()?.let { entry ->
+                        val localArtwork = entry.artwork?.takeIf {
+                            it.startsWith("content://") || it.startsWith("android.resource://")
+                        }
                         RecentContent(
                             if (next.availability in
                                 setOf(ContentAvailability.ERROR, ContentAvailability.DENIED, ContentAvailability.UNSUPPORTED)
                             ) {
                                 next.availability
-                            } else if (entry.artwork != null) {
+                            } else if (localArtwork != null) {
                                 ContentAvailability.AVAILABLE
                             } else {
                                 ContentAvailability.NO_LOCAL_ART
                             },
-                            entry.artwork,
+                            localArtwork,
                             entry.title,
                             entry.source,
                             entry.engagedAt,
@@ -141,6 +149,7 @@ class DefaultContentRepository(
             ContentSelection(
                 ContentFeed(availability, entries, feeds.mapValues { it.value.availability }),
                 background,
+                withContext(dispatchers.default) { continuationPerApp(entries) },
             )
         }
             .distinctUntilChanged()

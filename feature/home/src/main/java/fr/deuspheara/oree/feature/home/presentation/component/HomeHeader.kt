@@ -37,6 +37,7 @@ internal fun HomeHeader(
     onFocused: (HomeControl) -> Unit,
     onDown: () -> Unit,
     modifier: Modifier = Modifier,
+    onOverview: () -> Unit = {},
 ) {
     Row(
         modifier.testTag("home-header").onPreviewKeyEvent {
@@ -50,12 +51,22 @@ internal fun HomeHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        if (HomeControl.OVERVIEW in controls) {
+            HeaderControl(
+                stringResource(R.string.home_overview),
+                LauncherSymbol.HOME,
+                Modifier.focusRequester(focus.overview).testTag("overview").focusProperties { start = FocusRequester.Cancel },
+                reduced,
+                { onFocused(HomeControl.OVERVIEW) },
+                onClick = onOverview,
+            )
+        }
         if (HomeControl.SEARCH in controls) {
             HeaderControl(
                 stringResource(R.string.search),
                 LauncherSymbol.SEARCH,
                 Modifier.focusRequester(focus.search).testTag("search").focusProperties {
-                    start = FocusRequester.Cancel
+                    if (HomeControl.OVERVIEW !in controls) start = FocusRequester.Cancel
                 },
                 reduced,
                 { onFocused(HomeControl.SEARCH) },
@@ -63,10 +74,10 @@ internal fun HomeHeader(
             )
         }
         HeaderControl(
-            stringResource(R.string.command_center),
-            LauncherSymbol.CONTROLS,
+            stringResource(if (HomeControl.COMMANDS in controls) R.string.command_center else R.string.launcher_settings),
+            if (HomeControl.COMMANDS in controls) LauncherSymbol.CONTROLS else LauncherSymbol.SETTINGS,
             Modifier.focusRequester(focus.commands).testTag("commands").focusProperties {
-                if (HomeControl.SEARCH !in controls) start = FocusRequester.Cancel
+                if (HomeControl.SEARCH !in controls && HomeControl.OVERVIEW !in controls) start = FocusRequester.Cancel
             },
             reduced,
             { onFocused(HomeControl.COMMANDS) },

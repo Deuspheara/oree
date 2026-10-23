@@ -87,9 +87,46 @@ class SystemActionLauncher(private val activity: Activity) {
         }
     }
 
-    fun network(): Boolean = settingsRoute(Settings.ACTION_WIFI_SETTINGS)
+    private fun quickPanel(panel: String, fallback: String): Boolean = try {
+        activity.startActivity(Intent(panel))
+        true
+    } catch (_: android.content.ActivityNotFoundException) {
+        settingsRoute(fallback)
+    } catch (_: SecurityException) {
+        settingsRoute(fallback)
+    }
 
-    fun audio(): Boolean = settingsRoute(Settings.ACTION_SOUND_SETTINGS)
+    fun network(): Boolean = if (android.os.Build.VERSION.SDK_INT >= 29) {
+        quickPanel(Settings.Panel.ACTION_WIFI, Settings.ACTION_WIFI_SETTINGS)
+    } else {
+        settingsRoute(Settings.ACTION_WIFI_SETTINGS)
+    }
+
+    fun adjustMediaVolume(direction: Int): Boolean = try {
+        val audio = activity.getSystemService(android.media.AudioManager::class.java)
+        if (audio == null || audio.isVolumeFixed || direction !in -1..1) {
+            false
+        } else {
+            audio.adjustStreamVolume(
+                android.media.AudioManager.STREAM_MUSIC,
+                when (direction) {
+                    -1 -> android.media.AudioManager.ADJUST_LOWER
+                    1 -> android.media.AudioManager.ADJUST_RAISE
+                    else -> android.media.AudioManager.ADJUST_TOGGLE_MUTE
+                },
+                0,
+            )
+            true
+        }
+    } catch (_: SecurityException) {
+        false
+    }
+
+    fun audio(): Boolean = if (android.os.Build.VERSION.SDK_INT >= 29) {
+        quickPanel(Settings.Panel.ACTION_VOLUME, Settings.ACTION_SOUND_SETTINGS)
+    } else {
+        settingsRoute(Settings.ACTION_SOUND_SETTINGS)
+    }
 
     fun settings(): Boolean = try {
         activity.startActivity(Intent(Settings.ACTION_SETTINGS))

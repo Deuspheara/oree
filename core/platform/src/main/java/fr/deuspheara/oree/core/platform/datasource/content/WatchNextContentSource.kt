@@ -2,7 +2,6 @@ package fr.deuspheara.oree.core.platform.datasource.content
 
 import android.content.Context
 import android.media.tv.TvContract
-import android.net.Uri
 import android.os.CancellationSignal
 import fr.deuspheara.oree.core.domain.concurrency.AppDispatchers
 import fr.deuspheara.oree.core.domain.concurrency.Clock
@@ -11,6 +10,7 @@ import fr.deuspheara.oree.core.model.ContentAvailability
 import fr.deuspheara.oree.core.model.ContentEntry
 import fr.deuspheara.oree.core.model.ContentFeed
 import fr.deuspheara.oree.core.model.ContentSourceId
+import fr.deuspheara.oree.core.model.ContinuationKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -44,22 +44,38 @@ class WatchNextContentSource(
                     var seen = 0
                     var stale = false
                     val now = clock.nowMillis()
-                    (
-                        query?.invoke(fields, signal)
-                            ?: if (query == null) {
-                                context.contentResolver.query(
-                                    TvContract.WatchNextPrograms.CONTENT_URI,
-                                    fields,
-                                    null,
-                                    null,
-                                    "last_engagement_time_utc_millis DESC, _id DESC",
-                                    signal,
-                                )
-                            } else {
-                                null
-                            }
+                    val metadataFields = fields + arrayOf(
+                        "episode_title",
+                        "episode_display_number",
+                        "season_display_number",
+                        "duration_millis",
+                        "last_playback_position_millis",
+                        "thumbnail_uri",
+                    )
+                    fun read(projection: Array<String>): android.database.Cursor? = if (query != null) {
+                        query.invoke(projection, signal)
+                    } else {
+                        context.contentResolver.query(
+                            TvContract.WatchNextPrograms.CONTENT_URI,
+                            projection,
+                            null,
+                            null,
+                            "last_engagement_time_utc_millis DESC, _id DESC",
+                            signal,
                         )
+                    }
+                    // Vendor providers may reject optional columns. Preserve the existing feed.
+                    val cursor = try {
+                        read(metadataFields)
+                    } catch (_: IllegalArgumentException) {
+                        read(fields)
+                    }
+                    cursor
                         ?.use { c ->
+                            fun text(column: String): String? = c.getColumnIndex(column).takeIf { it >= 0 && !c.isNull(it) }
+                                ?.let { c.getString(it) }?.filterNot(Char::isISOControl)?.take(200)?.trim()?.takeIf { it.isNotEmpty() }
+                            fun millis(column: String): Long? = c.getColumnIndex(column).takeIf { it >= 0 && !c.isNull(it) }
+                                ?.let { c.getLong(it) }?.takeIf { it in 0..604_800_000L }
                             while (seen++ < 200 && c.moveToNext()) {
                                 val source = c.getString(2).orEmpty()
                                 if (c.getInt(5) !in 0..1) continue
@@ -93,13 +109,9 @@ class WatchNextContentSource(
                                 ) {
                                     continue
                                 }
-                                val raw = c.getString(3)
-                                val artwork =
-                                    raw?.takeIf { it.length <= 4096 }
-                                        ?.let(Uri::parse)
-                                        ?.takeIf {
-                                            it.scheme in listOf("content", "android.resource")
-                                        }
+                                val artwork = contentArtworkUri(c.getString(3))
+                                    ?: c.getColumnIndex("thumbnail_uri").takeIf { it >= 0 && !c.isNull(it) }
+                                        ?.let { contentArtworkUri(c.getString(it)) }
                                 // Keep titles for local-only wallpaper diagnostics even when a
                                 // link is absent.
                                 rows +=
@@ -107,9 +119,15 @@ class WatchNextContentSource(
                                         "$source:${c.getLong(0)}",
                                         title,
                                         source,
-                                        artwork?.toString(),
+                                        artwork,
                                         link,
                                         time,
+                                        episodeTitle = text("episode_title"),
+                                        episodeNumber = text("episode_display_number"),
+                                        seasonNumber = text("season_display_number"),
+                                        durationMillis = millis("duration_millis"),
+                                        playbackPositionMillis = millis("last_playback_position_millis"),
+                                        continuationKind = if (c.getInt(5) == 0) ContinuationKind.CONTINUE else ContinuationKind.NEXT,
                                     )
                             }
                         } ?: throw IllegalArgumentException("No TV provider")

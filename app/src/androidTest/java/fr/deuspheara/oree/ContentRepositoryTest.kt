@@ -32,6 +32,7 @@ class ContentRepositoryTest {
             time,
             kind,
             "player://episode/$id",
+            "Chapter $id", "2", "1", 100_000L, 25_000L,
         )
 
     @Test
@@ -49,6 +50,23 @@ class ContentRepositoryTest {
         assertEquals("org.example.player:1", feed.entries.first().id)
         assertNull(feed.entries.first().artwork)
         assertEquals("Episode 1", feed.entries.first().title)
+        assertEquals("Chapter 1", feed.entries.first().episodeTitle)
+        assertEquals(.25f, feed.entries.first().playbackProgress)
+    }
+
+    @Test
+    fun optionalMetadataRejectionFallsBackToExistingProjection() = runBlocking {
+        var reads = 0
+        val repo = WatchNextContentSource(context) { fields, _ ->
+            reads++
+            if ("duration_millis" in fields) throw IllegalArgumentException("Unsupported optional column")
+            MatrixCursor(fields).apply { addRow(row(1).take(fields.size)) }
+        }
+        val feed = repo.loadFeed(true)
+        assertEquals(2, reads)
+        assertEquals(ContentAvailability.AVAILABLE, feed.availability)
+        assertNull(feed.entries.single().playbackProgress)
+        assertEquals("Episode 1", feed.entries.single().title)
     }
 
     @Test
@@ -112,6 +130,16 @@ class ContentRepositoryTest {
         job.cancelAndJoin()
         assertEquals(0, cancelled.count)
         assertFalse(published)
+    }
+
+    @Test
+    fun ordinaryCallerReportsOnlyAggregateOptionalMetadataAvailability() = runBlocking {
+        val feed = WatchNextContentSource(context).loadSnapshot()
+        val report = "availability=${feed.availability}; entries=${feed.entries.size}; " +
+            "episodes=${feed.entries.count { it.episodeTitle != null || it.episodeNumber != null }}; " +
+            "progress=${feed.entries.count { it.playbackProgress != null }}"
+        java.io.File(context.cacheDir, "tvos26-content-probe.txt").writeText(report)
+        assertTrue(feed.entries.size <= 200)
     }
 
     @Test

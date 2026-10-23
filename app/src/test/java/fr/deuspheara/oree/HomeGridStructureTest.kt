@@ -2,6 +2,7 @@ package fr.deuspheara.oree
 
 import androidx.compose.ui.unit.IntSize
 import fr.deuspheara.oree.feature.home.presentation.state.homeArtworkSize
+import fr.deuspheara.oree.feature.home.presentation.state.homeGridArtworkSize
 import fr.deuspheara.oree.feature.home.presentation.state.homeGridSlots
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +26,18 @@ class HomeGridStructureTest {
     fun unknownArtworkWaitsForLayoutAndLargeArtworkKeepsItsExistingCap() {
         assertEquals(IntSize.Zero, homeArtworkSize(IntSize.Zero))
         assertEquals(IntSize(480, 270), homeArtworkSize(IntSize(800, 450)))
+    }
+
+    @Test
+    fun preparedArtworkIncludesAdaptiveRemaindersAndKeepsDecodeBounds() {
+        assertEquals(IntSize.Zero, homeGridArtworkSize(0, 120, 20))
+        assertEquals(homeArtworkSize(IntSize(120, 68)), homeGridArtworkSize(120, 120, 20))
+        // Two cells share 466 pixels: the widest cell gets the remainder pixel (233).
+        assertEquals(IntSize(320, 180), homeGridArtworkSize(485, 220, 19))
+        assertEquals(IntSize(480, 270), homeGridArtworkSize(2000, 900, 20))
+        // Crossing Adaptive's column threshold must retarget the request size.
+        assertEquals(IntSize(480, 270), homeGridArtworkSize(459, 220, 20))
+        assertEquals(IntSize(256, 144), homeGridArtworkSize(460, 220, 20))
     }
 
     @Test

@@ -51,6 +51,7 @@ fun RetainedMenuSurface(
     role: GlassSurfaceRole = GlassSurfaceRole.MENU,
     radius: Dp = 26.dp,
     treatment: GlassTreatment = GlassTreatment.SOFT,
+    progressive: dev.chrisbanes.haze.HazeProgressive? = null,
     performanceMode: dev.chrisbanes.haze.HazePerformanceMode =
         dev.chrisbanes.haze.HazePerformanceMode.Balanced,
 ) {
@@ -75,27 +76,13 @@ fun RetainedMenuSurface(
             !LocalOpaquePanels.current
     val layer = rememberGraphicsLayer()
     // Reset capture ownership, not the live material node: moving must reuse its shader stages.
-    val capture =
-        remember(
-            sourceKey,
-            source,
-            LocalLiquidGlass.current,
-            LocalGlassIntensity.current,
-            LocalReducedTransparency.current,
-            LocalOpaquePanels.current,
-            DesignTokens.surface,
-            DesignTokens.background,
-            size,
-            position,
-            role,
-            radius,
-            treatment,
-            performanceMode,
-            LocalDensity.current,
-            LocalLayoutDirection.current,
-        ) {
-            RetainedSurfaceCapture()
-        }
+    val materialKey = listOf(
+        sourceKey, source, LocalLiquidGlass.current, LocalGlassIntensity.current,
+        LocalReducedTransparency.current, LocalOpaquePanels.current,
+        DesignTokens.surface, DesignTokens.background, size, role, radius, treatment, progressive,
+        performanceMode, LocalDensity.current, LocalLayoutDirection.current,
+    )
+    val capture = remember(materialKey, position) { RetainedSurfaceCapture() }
     LaunchedEffect(enabled, capture, capture.recorded) {
         if (
             enabled &&
@@ -154,6 +141,7 @@ fun RetainedMenuSurface(
                             radius = radius,
                             treatment = treatment,
                             role = role,
+                            progressive = progressive,
                             performanceMode = performanceMode,
                         )
                     },

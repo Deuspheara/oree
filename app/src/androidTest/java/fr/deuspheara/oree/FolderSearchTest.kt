@@ -159,7 +159,7 @@ class FolderSearchTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("folder-rename").assertIsFocused()
-        compose.onNodeWithTag("folder-close").assertExists()
+        compose.onNodeWithTag("folder-options").assertExists()
     }
 
     @Test

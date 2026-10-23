@@ -90,6 +90,7 @@ import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
 import fr.deuspheara.oree.core.model.AvatarIds
 import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.feature.profiles.presentation.component.AvatarPicker
+import fr.deuspheara.oree.feature.profiles.presentation.component.AvatarSelectionBadge
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -163,12 +164,12 @@ fun ProfilePanel(
                         } else {
                             false
                         }
-                    }
-                    .padding(top = 82.dp, end = 32.dp, start = 32.dp, bottom = 24.dp),
+                    },
                 contentAlignment = Alignment.TopEnd,
             ) {
                 Box(
-                    Modifier.width(if (editing) 420.dp else 280.dp)
+                    Modifier.padding(top = 82.dp, end = 32.dp, start = 32.dp, bottom = 24.dp)
+                        .width(if (editing) 420.dp else 280.dp)
                         .heightIn(max = 440.dp)
                         .panelMotion(motion, reduced, 32f)
                         .testTag("profile-panel"),
@@ -264,6 +265,15 @@ fun ProfilePanel(
                                                 Modifier.fillMaxSize(),
                                                 shape = CircleShape,
                                                 edgeHighlight = false,
+                                                overlay = {
+                                                    if (p.id == snapshot.activeId) {
+                                                        AvatarSelectionBadge(
+                                                            Modifier.align(Alignment.BottomEnd)
+                                                                .offset((-4).dp, (-4).dp)
+                                                                .testTag("profile-active:${p.id}"),
+                                                        )
+                                                    }
+                                                },
                                             ) {
                                                 ProfileAvatar(
                                                     p.avatar,

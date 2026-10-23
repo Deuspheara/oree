@@ -56,6 +56,7 @@ import androidx.compose.ui.zIndex
 import androidx.tv.material3.Button
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import fr.deuspheara.oree.core.designsystem.R
 import fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork
 import fr.deuspheara.oree.core.designsystem.artwork.LocalArtworkReflections
@@ -73,6 +74,8 @@ import fr.deuspheara.oree.feature.home.presentation.state.homeArtworkSize
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
+internal val HomeCardFocusSpec = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 260f)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppTile(
@@ -87,6 +90,7 @@ fun AppTile(
     onUp: (() -> Unit)? = null,
     freshUpOnly: Boolean = false,
     loadingVisible: Boolean = true,
+    preparedArtworkSize: IntSize? = null,
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
     var focused by remember { mutableStateOf(false) }
@@ -96,28 +100,15 @@ fun AppTile(
     var hoverTilt by remember { mutableStateOf<Offset?>(null) }
     var impulse by remember { mutableIntStateOf(0) }
     LaunchedEffect(focused, impulse, reduceMotion) {
-        tilt = if (focused && !reduceMotion) navigation.direction * .65f else Offset.Zero
+        tilt = if (focused && !reduceMotion) navigation.direction * .30f else Offset.Zero
         if (focused && !reduceMotion) {
-            delay(90)
+            delay(120)
             tilt = Offset.Zero
         }
     }
     var artworkSize by remember { mutableStateOf(IntSize.Zero) }
-    val reflectionKey =
-        remember(app.artworkCacheKey, artworkSize, app.artworkKind) {
-            ReflectionKey(
-                app.artworkCacheKey,
-                artworkSize.width,
-                artworkSize.height,
-                app.artworkKind == ArtworkKind.BANNER,
-            )
-        }
-    val reflectionCache = LocalArtworkReflections.current
-    var reflectionColors by
-        remember(reflectionKey) { mutableStateOf(reflectionCache.colors(reflectionKey)) }
-    var artworkPhase by
-        remember(app.artworkCacheKey, artworkSize) { mutableStateOf(ArtworkPhase.WAITING) }
     var artworkVisible by remember { mutableStateOf(false) }
+    val resolvedArtworkSize = preparedArtworkSize ?: artworkSize
     val artworkWindow = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
     Column(
         Modifier.zIndex(if (focused) 1f else 0f)
@@ -126,68 +117,26 @@ fun AppTile(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).onSizeChanged {
-                artworkSize = homeArtworkSize(it)
-            },
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).then(
+                if (preparedArtworkSize == null) {
+                    Modifier.onSizeChanged { artworkSize = homeArtworkSize(it) }
+                } else {
+                    Modifier
+                },
+            ),
             contentAlignment = Alignment.Center,
         ) {
             // Only pixels scale. The standard input surface above it owns a fixed spatial,
             // focus and accessibility rectangle throughout the animation.
-            FocusArtwork(
-                focused,
-                pressed,
-                reduceMotion,
-                hoverTilt ?: tilt,
-                Modifier.fillMaxWidth().fillMaxSize(),
-                immediateFocus = true,
-                reflectionColors = reflectionColors,
-            ) {
-                key(app.artworkCacheKey, artworkSize) {
-                    HomeArtworkPlaceholder(
-                        app.label,
-                        artworkPhase,
-                        artworkVisible && loadingVisible,
-                        reduceMotion || !focused,
-                    )
-                }
-                if (app.artwork != 0 && artworkSize != IntSize.Zero) {
-                    val context = LocalContext.current
-                    val request =
-                        remember(reflectionKey, reduceMotion) {
-                            ImageRequest.Builder(context)
-                                .data("android.resource://${app.packageName}/${app.artwork}")
-                                .memoryCacheKey(app.artworkCacheKey)
-                                .size(artworkSize.width, artworkSize.height)
-                                .precision(coil3.size.Precision.EXACT)
-                                .apply {
-                                    if (!reduceMotion) extras[ReflectionRequestKey] = reflectionKey
-                                }
-                                .build()
-                        }
-                    AsyncImage(
-                        request,
-                        contentDescription = null,
-                        modifier =
-                            if (app.artworkKind == ArtworkKind.ICON) {
-                                Modifier.fillMaxSize().padding(12.dp)
-                            } else {
-                                Modifier.fillMaxSize()
-                            },
-                        contentScale =
-                            if (app.artworkKind == ArtworkKind.BANNER) {
-                                ContentScale.Crop
-                            } else {
-                                ContentScale.Fit
-                            },
-                        onLoading = { artworkPhase = ArtworkPhase.LOADING },
-                        onSuccess = {
-                            reflectionColors = reflectionCache.colors(reflectionKey)
-                            artworkPhase = ArtworkPhase.READY
-                        },
-                        onError = { artworkPhase = ArtworkPhase.FAILED },
-                    )
-                }
-            }
+            AppTileArtwork(
+                app = app,
+                artworkSize = resolvedArtworkSize,
+                focused = focused,
+                pressed = pressed,
+                reduceMotion = reduceMotion,
+                tilt = hoverTilt ?: tilt,
+                loadingVisible = artworkVisible && loadingVisible,
+            )
             Box(
                 Modifier.matchParentSize()
                     .focusProperties {
@@ -273,6 +222,86 @@ fun AppTile(
                         onLongClick = onMenu?.let { { it(bounds) } },
                         onClick = { onClick(bounds) },
                     ),
+            )
+        }
+    }
+}
+
+/** Decode callbacks invalidate only artwork, never the card's input and focus subtree. */
+@Composable
+private fun AppTileArtwork(
+    app: TvApp,
+    artworkSize: IntSize,
+    focused: Boolean,
+    pressed: Boolean,
+    reduceMotion: Boolean,
+    tilt: Offset,
+    loadingVisible: Boolean,
+) {
+    val reflectionKey = remember(app.artworkCacheKey, artworkSize, app.artworkKind) {
+        ReflectionKey(app.artworkCacheKey, artworkSize.width, artworkSize.height, app.artworkKind == ArtworkKind.BANNER)
+    }
+    val reflectionCache = LocalArtworkReflections.current
+    var reflectionColors by remember(reflectionKey) { mutableStateOf(reflectionCache.colors(reflectionKey)) }
+    var artworkPhase by remember(app.artworkCacheKey, artworkSize) { mutableStateOf(ArtworkPhase.WAITING) }
+    FocusArtwork(
+        focused,
+        pressed,
+        reduceMotion,
+        tilt,
+        Modifier.fillMaxWidth().fillMaxSize(),
+        reflectionColors = reflectionColors,
+        cacheArtwork = true,
+        focusSpec = HomeCardFocusSpec,
+    ) {
+        key(app.artworkCacheKey, artworkSize) {
+            HomeArtworkPlaceholder(
+                app.label,
+                artworkPhase,
+                loadingVisible,
+                reduceMotion || !focused,
+            )
+        }
+        if (app.artwork != 0 && artworkSize != IntSize.Zero) {
+            val context = LocalContext.current
+            val request =
+                remember(reflectionKey, reduceMotion) {
+                    ImageRequest.Builder(context)
+                        .data("android.resource://${app.packageName}/${app.artwork}")
+                        .memoryCacheKey(app.artworkCacheKey)
+                        .size(artworkSize.width, artworkSize.height)
+                        .precision(coil3.size.Precision.EXACT)
+                        .apply {
+                            if (!reduceMotion) {
+                                // The palette reads pixels on Default. Decode readable pixels once,
+                                // rather than uploading a hardware bitmap then reading it back.
+                                allowHardware(false)
+                                extras[ReflectionRequestKey] = reflectionKey
+                            }
+                        }
+                        .build()
+                }
+            AsyncImage(
+                request,
+                contentDescription = null,
+                modifier =
+                    if (app.artworkKind == ArtworkKind.ICON) {
+                        Modifier.fillMaxSize().padding(12.dp)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
+                contentScale =
+                    if (app.artworkKind == ArtworkKind.BANNER) {
+                        ContentScale.Crop
+                    } else {
+                        ContentScale.Fit
+                    },
+                onLoading = { artworkPhase = ArtworkPhase.LOADING },
+                onSuccess = {
+                    reflectionColors = reflectionCache.colors(reflectionKey)
+                    artworkPhase = ArtworkPhase.READY
+                },
+                onError = { artworkPhase = ArtworkPhase.FAILED },
             )
         }
     }

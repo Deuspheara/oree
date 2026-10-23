@@ -298,10 +298,7 @@ class CommandPanelTest {
         val status =
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
                 .targetContext
-                .getString(
-                    R.string.audio_available,
-                    "HDMI",
-                )
+                .getString(R.string.control_volume_fixed)
         compose
             .onNodeWithTag("command-audio")
             .assertIsDisplayed()
@@ -315,7 +312,7 @@ class CommandPanelTest {
         val label =
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
                 .targetContext
-                .getString(R.string.audio_settings)
+                .getString(R.string.control_sound)
         compose.onNodeWithTag("command-audio").assertContentDescriptionEquals(label)
         compose.onNodeWithText(label).assertDoesNotExist()
     }

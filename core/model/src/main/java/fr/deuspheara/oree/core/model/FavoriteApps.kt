@@ -1,6 +1,8 @@
 package fr.deuspheara.oree.core.model
 
+// Storage/import bound stays compatible with older profiles and folder membership.
 const val MAX_FAVORITE_APPS = 500
+const val MAX_DOCK_FAVORITES = 6
 
 /** Ordered component identities only. Never stores labels, artwork or an Activity. */
 fun setFavoriteApp(current: List<String>, id: String, favorite: Boolean): List<String> {
@@ -8,7 +10,7 @@ fun setFavoriteApp(current: List<String>, id: String, favorite: Boolean): List<S
     val unique = current.distinct()
     if (!favorite) return unique.filterNot { it == id }
     if (id in unique) return unique
-    require(unique.size < MAX_FAVORITE_APPS) { "Favorite limit reached" }
+    require(unique.size < MAX_DOCK_FAVORITES) { "Favorite limit reached" }
     return unique + id
 }
 

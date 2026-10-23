@@ -1,6 +1,7 @@
 package fr.deuspheara.oree.core.data.serialization
 
 import fr.deuspheara.oree.core.model.ControlId
+import fr.deuspheara.oree.core.model.HomeContentLayout
 import fr.deuspheara.oree.core.model.MAX_FAVORITE_APPS
 import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.core.model.validFolderComponent
@@ -116,7 +117,7 @@ private fun validateImportedValues(data: JSONObject) {
             throw IOException("Invalid favorites")
         }
         val settings = profile.getJSONObject("settings")
-        listOf("motion", "transparency", "contrast", "sideloaded", "context", "liquidGlass")
+        listOf("motion", "transparency", "contrast", "sideloaded", "context", "liquidGlass", "setupComplete")
             .forEach { key ->
                 if (settings.has(key) && settings.get(key) !is Boolean) {
                     throw IOException("Invalid appearance preference")
@@ -124,6 +125,14 @@ private fun validateImportedValues(data: JSONObject) {
             }
         number(settings, "text", 1.0, 2.0)
         number(settings, "glassIntensity", .25, 1.0)
+        number(settings, "backdropBlur", 0.0, 1.0)
+        number(settings, "motionIntensity", 0.0, 1.0)
+        if (settings.has("homeContentLayout") && HomeContentLayout.entries.none {
+                it.name == settings.get("homeContentLayout")
+            }
+        ) {
+            throw IOException("Invalid Home content layout")
+        }
         listOf("controls", "controlPositions").forEach { field ->
             if (settings.has(field)) {
                 val controls = settings.getJSONObject(field)

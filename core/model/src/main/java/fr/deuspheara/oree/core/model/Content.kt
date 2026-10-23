@@ -20,6 +20,8 @@ data class RecentContent(
     val engagedAt: Long? = null,
 )
 
+enum class ContinuationKind { CONTINUE, NEXT }
+
 data class ContentEntry(
     val id: String,
     val title: String,
@@ -28,7 +30,20 @@ data class ContentEntry(
     val intentUri: String,
     val engagedAt: Long?,
     val provider: ContentSourceId = ContentSourceId.WATCH_NEXT,
-)
+    val episodeTitle: String? = null,
+    val episodeNumber: String? = null,
+    val seasonNumber: String? = null,
+    val durationMillis: Long? = null,
+    val playbackPositionMillis: Long? = null,
+    val continuationKind: ContinuationKind? = null,
+) {
+    val playbackProgress: Float?
+        get() {
+            val duration = durationMillis?.takeIf { it > 0 } ?: return null
+            val position = playbackPositionMillis?.takeIf { it >= 0 && it <= duration } ?: return null
+            return position.toFloat() / duration
+        }
+}
 
 data class ContentFeed(
     val availability: ContentAvailability,
@@ -53,3 +68,19 @@ enum class ContentSourceId {
     WATCH_NEXT,
     PROGRAMS,
 }
+
+/** One useful continuation per publisher; genuine progress precedes upcoming/promotional entries. */
+fun continuationPerApp(entries: List<ContentEntry>): List<ContentEntry> = entries
+    .sortedWith(
+        compareByDescending<ContentEntry> { it.provider == ContentSourceId.WATCH_NEXT }
+            .thenByDescending {
+                when {
+                    it.playbackProgress?.let { progress -> progress > 0f && progress < .98f } == true -> 2
+                    it.continuationKind == ContinuationKind.CONTINUE && (it.playbackProgress ?: 0f) < .98f -> 1
+                    else -> 0
+                }
+            }
+            .thenByDescending { it.engagedAt ?: 0L },
+    )
+    .distinctBy { it.source }
+    .sortedByDescending { it.engagedAt ?: 0L }

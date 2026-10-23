@@ -84,7 +84,7 @@ internal fun HeaderControl(
                             )
                         }
                     }
-                    .glassSurface(radius = 20.dp)
+                    .glassSurface(radius = 20.dp, treatment = fr.deuspheara.oree.core.designsystem.glass.GlassTreatment.CLEAR)
                     .focusProperties { if (end) this.end = FocusRequester.Cancel }
                     .onFocusChanged {
                         focused = it.isFocused

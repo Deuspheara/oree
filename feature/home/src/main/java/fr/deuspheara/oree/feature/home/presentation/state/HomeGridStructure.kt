@@ -12,6 +12,16 @@ fun homeArtworkSize(size: IntSize): IntSize {
     return IntSize(bounded, bounded * 9 / 16)
 }
 
+/** Match Adaptive's widest cell, including its remainder pixel, before items are measured. */
+fun homeGridArtworkSize(availableWidth: Int, minimumCellWidth: Int, spacing: Int): IntSize {
+    require(minimumCellWidth > 0 && spacing >= 0)
+    if (availableWidth <= 0) return IntSize.Zero
+    val columns = ((availableWidth.toLong() + spacing) / (minimumCellWidth.toLong() + spacing)).coerceAtLeast(1).toInt()
+    val cellSpace = availableWidth - spacing * (columns - 1)
+    val width = cellSpace / columns + if (cellSpace % columns == 0) 0 else 1
+    return homeArtworkSize(IntSize(width, (width * 9f / 16).toInt()))
+}
+
 /** Real lazy-item index plus logical row edges; headings/status occupy full lines. */
 data class HomeGridSlot(val itemIndex: Int, val atStart: Boolean, val atEnd: Boolean)
 

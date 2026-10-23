@@ -52,4 +52,5 @@ fun ContentFeed.forPackage(packageName: String?, limit: Int): ContentFeed {
 data class ContentSelection(
     val feed: ContentFeed = ContentFeed(ContentAvailability.DISABLED),
     val wallpaper: RecentContent = RecentContent(ContentAvailability.DISABLED),
+    val homeEntries: List<fr.deuspheara.oree.core.model.ContentEntry> = feed.entries,
 )

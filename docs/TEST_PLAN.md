@@ -54,3 +54,196 @@ Test photo/provider permission denial without shell grants. Real-photo cases req
 Inspect actual optimized rendering, focus/press/loading/error states, EN/FR, RTL, large text, contrast, reduced transparency/motion and relevant input devices. Confirm observers stop below STARTED and refresh on return. Record source/APK, hardware, SDK, build, scenario, caches, failures and limits. Label emulator evidence explicitly.
 
 Follow [Performance](PERFORMANCE.md) for optimized comparisons and [Recovery](RECOVERY.md) for safety. BaselineProfileRule on API 33 may reinstall its target during compilation reset, even with direct instrumentation: collect profiles only on disposable fixtures. Keep raw logs, APKs, traces and captures outside tracked source. Release acceptance requires evidence against the actual changed behavior and physical budgets.
+
+## tvOS 26 interaction study regressions
+
+`SettingsScreenTest` covers explicit choice browsing/commit, Back without changing a choice,
+category-before-exit navigation, reset confirmation, retained save failure and recreation.
+`TvInteractionStudyTest` adds stable option/scroll return across categories, uninstall submenu
+return, cancel-first folder removal, async Search focus ownership and photo-direction/Back
+contracts. Its photo collection uses project-owned resource fixtures, not MediaStore permission
+or real-photo evidence. `FolderSearchTest`, `AppContextMenuTest`, `FavoriteReorderTest`,
+`AppPreviewsTest`, `ProfilePanelTest`, `CommandPanelTest`, `PhotoGalleryTest` and
+`ExtensionPanelsTest` retain the surrounding native input and lifecycle regressions.
+`ContentRepositoryTest` verifies optional Watch Next metadata and fallback when a provider
+rejects its optional projection. Real caller probes remain separate from cursor fixtures.
+
+Use direct replacement installs and the runner above; do not reset configured device stores.
+Record exact passing/failing classes and source/APK identities privately, inspect window
+captures, and keep release/performance acceptance separate from these focused tests.
+
+`LauncherLifecycleTest` additionally opens two different Settings destinations from Search
+within one Activity, including diagnostics recreation, so a previous visit cannot replace the
+new entry category. An expected submenu return must target its own action row rather than Open.
+
+LocalPhotoThumbnailTest uses a synthetic portrait through an in-process provider to verify
+that thumbnail reads avoid the original, checks resource fallback/fullscreen cache isolation,
+and rejects arbitrary file schemes. It does not grant photo permissions or read personal media.
+Check Search → Wallpaper → Gallery → Android picker → cancel on device, including saved
+Search-result return and absence of parent Search cards behind the gallery.
+
+## Home artwork prefetch regression
+
+`HomeGridStructureTest` covers adaptive column thresholds, remainder pixels and the existing
+480×270 request cap. `HomeArtworkPrefetchTest` compares the prepared request bucket with
+actual Foundation grid measurements across column changes, and composes an unmeasured card
+with a synthetic failing image loader to verify that its bounded request starts before layout.
+It also verifies that palette-sampled artwork requests CPU-readable decoding. The fixture
+restores the application image loader afterward. A resting Home fixture with a content-preview row verifies that nearby
+catalog artwork starts loading while dock focus remains selected and the catalog card is not
+displayed. Keep `HomeArtworkLoadingTest`, `HomeCardResponseTest` and `HomeFocusTest` for loading, reduced motion, input bounds and focus
+restoration. These checks establish behavior, not frame-time improvement; compare optimized
+builds on physical hardware for the first catalog reveal and newly appearing rows.
+
+For Home's bounded recent-row retention, compare the settled-header first catalog reveal and
+rapid return through the dock separately. Match actual device-side events, focus walks and
+visible scenes in alternating optimized builds. Run the vertical motion/reversal, header
+restoration and artwork-prefetch native cases, then check repeated-tour PSS, HWUI cache and
+background/resume outside timed runs. Larger windows are experiments rather than assumed
+improvements; retain the existing visual, request, quality and motion policies. A screen
+recording can diagnose trajectory, but encoding perturbs rendering and cannot certify budgets.
+
+## Search rendering regression
+
+`SearchRenderingTest` verifies that a retained glass backdrop keeps query editing, result
+replacement, selection and native focus live across backdrop identity changes. A synthetic
+image loader verifies that nearby offscreen results prefetch without moving query focus or
+requesting the entire result set. `RetainedMenuSurfaceTest` retains source-color, position and
+opaque-fallback coverage. Keep `FolderSearchTest`, `TvInteractionStudyTest` and
+`LauncherLifecycleTest` for grouped result focus, removal, Close, IME/Back, nested return and
+recreation. The runtime backdrop identity includes both wallpaper frame and scene softening;
+changing the material must not reset the saved query or grid position.
+
+## Folder management follow-up
+
+`FolderManagementTest` adds first-row Up/title navigation, surviving-header focus under
+package changes, held folder-opening release suppression, create-name focus and nested Back
+(including IME dismissal), explicit transfers from other folders, Add apps trigger restoration
+and the all-added Close fallback. See [Folder management](FOLDER_MANAGEMENT.md) for contracts.
+
+The final focused physical API 34 run passes 26/26 cases across FolderManagementTest,
+FolderSearchTest, TvInteractionStudyTest, FolderVisualTest, FavoriteReorderTest and
+AppContextMenuTest. Earlier intermediate runs found native focus races and an IME-aware
+Back expectation; those were corrected. One attempt could not start because the CLI inspection
+helper already owned UiAutomation; ending that helper allowed the direct runner to proceed.
+Do not sum overlapping runs. The final appearance fixture asserts actual English/French labels
+inside the dialog and produces project-only captures of dark/light and 200% text with contrast,
+reduced transparency and reduced motion. These captures were visually inspected. Configured
+profile datastore bytes match the private archive taken before instrumentation. Initial archive
+access was refused by the original non-debuggable APK; initial byte-for-byte preservation is
+not established. No system HOME/accessibility/display/power setting was changed.
+
+After the measured retained-glass change and native nested-window focus correction, the same
+26-case suite passes again against the final source. The strengthened transfer case changes
+the backdrop key while retaining focused row actions. Optimized native checks separately
+confirm held Select, the compact French count badge, Add apps entry and Back to the exact
+Add apps header control. Opening/closing and list navigation have separate performance
+samples; neither functional passes nor a warm list sample establish general smoothness.
+
+### Home, continuation artwork and Control Center follow-up
+
+At the user's request, verification was limited to formatting, optimized compilation, physical
+screens/layout inspection and short diagnostic frame samples. The full build gates/test suite
+above were not rerun. Screens confirmed the dock's complete outline on focus return, compact
+Control Center, sound controls and unchanged default HOME after replacement installs. No Wi-Fi
+or volume adjustment was executed. Native-window/IME dismissal was separated from Search Close.
+Read-only diagnostics confirmed cross-app TV entries and zero local-art entries in the visible
+sample; HTTPS artwork for Twitch/CANAL+/Prime Video has not been confirmed end-to-end. Notification
+access was not added. See PERFORMANCE.md for remaining budget failures and experiment limits.
+
+## Overview, Peek and motion follow-up
+
+`HomeNavigationTest` covers section jumps and section-specific position memory, native Back
+return to Overview, explicit Peek entry, member launch/return, empty-folder full browsing, unchanged ordinary Down navigation,
+opening held-release suppression and surviving header focus across membership changes.
+TV Material3 buttons must be activated with D-pad Select; a touch click is not an equivalent
+precondition in these keyboard-mode fixtures. Wait for native window focus when crossing
+modal boundaries. `HomeCardResponseTest` adds controlled-clock entry/release continuity;
+this is not a physical latency measurement. Keep `HomeFocusTest`, `SettingsScreenTest` and
+`ProfilePanelTest` for surrounding input, recreation, settings acceptance and identity checks.
+The dock regression uses the current six-favorite cap; the glass regression exercises the
+current draft slider before Select commits. Avatar badges are descendants of merged profile
+buttons and their tag assertions use the unmerged tree.
+
+On optimized physical builds, inspect continuation spacing during rapid horizontal movement,
+vertical scrolling, Overview/Peek/Back and the profile side background. Compare Settings entry
+using a destination-checked Control Center → Settings scenario with unchanged preferences,
+warm artwork, the same device and compilation treatment. Keep raw frame dumps, screenshots,
+configured-data archives and intermediate failures outside tracked source.
+
+Lazy Settings tests locate offscreen controls through `performScrollToNode` on the section
+list before querying the leaf. Category restoration deliberately targets Defaults below the
+initial viewport, then restores Theme for chooser checks. SettingsVisualTest covers the
+same settled layout, preview, light/dark, large opaque text and English labels. The fixed
+source dark-top captures before and after lazy composition have identical PNG hashes.
+`LauncherLifecycleTest` additionally opens/closes Settings three times, verifies covered Home
+semantics disappear, and waits for the original header to regain native focus. A visible ready
+marker alone is insufficient evidence that the next frame's focus restoration has completed.
+The repeated Settings-return integration uses shell-injected D-pad Up/Select/Back rather than
+requesting the Home header through semantics; it checks the actual remote navigation path.
+The production header omits Overview and opens Settings directly from the gear button. The
+integration checks that Overview is absent and the command pill is not opened on Settings entry.
+Inspect the profile picker over the unblurred Home background; the editor retains its own surface.
+HomeNavigationTest explicitly covers a continuation row followed by header focus, covered
+Home, reveal and provider replacement. Provider refresh/restoration must not take focus from
+the active header. Reveal the lazy hero item before requesting its continuation requester.
+
+## Visual setup and navigation workload regressions
+
+VisualExperienceTest covers draft-only browsing, recreation, explicit completion, pending-write
+disablement and retry, plus Keep current. ProfileExperienceCodecTest covers optional-field
+round trips, legacy completed/full-motion defaults, profile identity and malformed imports.
+HomeNavigationTest checks the full viewport and first-card/heading alignment. SettingsScreenTest
+checks one-column category absence, Select entry and Back restoration. Compare optimized
+physical-TV navigation using unchanged preferences, cache conditions and normal D-pad input;
+controlled-clock Compose tests establish interaction contracts, not smoothness or latency.
+
+## Live dock compositing and full-page investigation
+
+`GlassStageFidelityTest` records native-window synthetic clear/soft/progressive material through
+movement, reversals, a press-like transform, translucent source replacement, resizing and
+reattachment. Pass `-e glassNativeLayer true` to exercise the bounded native layer around clear
+glass. Its stationary-frost brightness checks, including the wide source-aligned path, reject a stale or empty surface. The controlled
+clock, screenshot settling and captured pixels establish appearance/freshness cases, not physical
+input latency. Review moving frames and optimized Home separately, including Overview scaling,
+card press/tilt, source/profile changes and Settings return.
+
+`LauncherNavigationBaseline.fullPageFirst` and `fullPageWarm` use six Down/six Up presses per
+full-page tour at an absolute 500 ms device cadence. First traversal restarts the process and
+sets the real hero/header anchor; warm traversal primes one complete tour. A privately supplied
+`fullPageHeroTag` selects an existing stable item without injecting or modifying provider data.
+`continuationStablePair` prepares that item and its real next neighbor together in view, then
+uses the existing 150 ms horizontal cadence. Exported event identities, focus destinations,
+visible content/bounds and trace quality must agree before comparing builds. Provider row-ID
+churn is not permission to silently substitute a different focus destination. Keep memory,
+first-display and native interaction diagnostics outside the timed bursts; see PERFORMANCE.md
+for the measured scope, rejected variants and unresolved targets.
+
+
+## Continuous vertical return
+
+`HomeFocusTest.heldUpReturnStaysAnimatedAndDownInterruptsIt` injects a native repeated Up
+with normal motion, checks an intermediate dock position, then reverses Down before completion.
+Keep `onlyUpFromDockAnimatesItsReturnToBottom`, held-Up traversal, reduced-motion endpoint
+and original-column tests alongside it. Inspect the optimized app with rapid vertical input on
+the physical remote; these animation-clock contracts do not establish frame-rate smoothness.
+
+`HomeNavigationTest.reversingHeaderDownDoesNotFinishAnObsoleteContinuationRequest` starts
+with the large continuation item completely outside the viewport, begins its reveal from the
+fixed header, then reverses Up before that deferred focus request completes. It must retain
+header focus rather than complete the obsolete content request. Keep the offscreen precondition
+explicit: a partially visible lazy item can skip the asynchronous reveal and miss this race.
+
+`HomeFocusTest.economyKeepsVerticalPageReturnAnimated` matches the Economy effects setting
+with normal requested/system motion and requires an intermediate page position before return
+settles. Run alongside the explicit reduced-motion endpoint and rapid reversal cases. Prior
+normal-quality fixtures did not cover Economy's separate animation bypass.
+
+`HomePageReturnMotionTest` checks the upward handoff's carried starting speed, zero final
+speed, monotone/bounded fast returns, and stale/opposite/reset fallbacks. It is a deterministic
+motion-policy test, not native frame pacing. Keep the existing Economy, held-Up interruption,
+fully offscreen reversal, endpoint and Settings-restoration cases on the physical TV. In an
+optimized rapid-vertical comparison, check `TVL:pageReturnHandoff` before attributing results
+to the new branch; match actual keys/focus destinations and scenes, and report changes to the
+intended intermediate trajectory separately from rendering cost. Inspect the physical remote
+result without a recorder or benchmark active.

@@ -53,17 +53,19 @@ fun MacrobenchmarkScope.startLauncher(clearTask: Boolean = false) {
     check(device.wait(Until.hasObject(By.res("home-ready")), 5_000)) {
         "Preferences/organization/catalog are not ready"
     }
-    check(
-        device.wait(
-            Until.hasObject(
-                By.res(java.util.regex.Pattern.compile("app:.*|search|commands|profiles|choose-favorites"))
-                    .focused(true),
-            ),
-            5_000,
-        ),
-    ) {
-        "Usable home focus did not appear"
+    val focusDeadline = SystemClock.uptimeMillis() + 5_000
+    var focusReady = false
+    while (SystemClock.uptimeMillis() < focusDeadline) {
+        val tag = focusedTag()
+        if (tag?.startsWith("app:") == true || tag?.startsWith("content:") == true ||
+            tag in setOf("overview", "search", "commands", "profiles", "choose-favorites")
+        ) {
+            focusReady = true
+            break
+        }
+        SystemClock.sleep(50)
     }
+    check(focusReady) { "Usable home focus did not appear" }
     device.waitForIdle()
 }
 

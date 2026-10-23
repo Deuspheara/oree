@@ -1,5 +1,6 @@
 package fr.deuspheara.oree.feature.profiles.presentation.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -18,13 +19,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,8 +42,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -54,15 +62,19 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import fr.deuspheara.oree.core.designsystem.R
 import fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork
+import fr.deuspheara.oree.core.designsystem.component.LauncherIcon
 import fr.deuspheara.oree.core.designsystem.component.LauncherSymbol
 import fr.deuspheara.oree.core.designsystem.component.SettingsRow
 import fr.deuspheara.oree.core.designsystem.component.panelMotion
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
+import fr.deuspheara.oree.core.designsystem.focus.awaitRegisteredFocus
 import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.designsystem.glass.RetainedMenuSurface
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
+import fr.deuspheara.oree.core.model.LocalPhoto
 import fr.deuspheara.oree.core.model.LocalPhotos
 import fr.deuspheara.oree.core.model.PhotoAvailability
+import fr.deuspheara.oree.core.platform.image.LocalPhotoThumbnail
 
 @Composable
 fun PhotoGalleryScreen(
@@ -78,14 +90,27 @@ fun PhotoGalleryScreen(
     onRequestPermission: () -> Unit,
     onRetry: () -> Unit,
     sourceKey: Any?,
+    onPreview: ((LocalPhoto) -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    var alternatives by rememberSaveable { mutableStateOf(false) }
     val first = remember { FocusRequester() }
     val close = remember { FocusRequester() }
+    val picker = remember { FocusRequester() }
+    var returnToPicker by rememberSaveable { mutableStateOf(false) }
     val motion = rememberPanelTransition(reduced)
+    val grid = rememberLazyGridState()
+    val requesters = remember { mutableStateMapOf<String, FocusRequester>() }
+    var selectedUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var restorePending by remember { mutableStateOf(true) }
     GlassDialog(onDismissRequest = { if (!saving) motion.close(onClose) }) {
-        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().padding(24.dp).onPreviewKeyEvent {
+                // Initial loading may restore a thumbnail; subsequent user navigation owns focus.
+                if (photos == null && it.type == KeyEventType.KeyDown) restorePending = false
+                false
+            },
+            contentAlignment = Alignment.Center,
+        ) {
             Box(
                 Modifier.width(720.dp)
                     .heightIn(max = 480.dp)
@@ -132,7 +157,8 @@ fun PhotoGalleryScreen(
                             PhotoAvailability.AVAILABLE ->
                                 LazyVerticalGrid(
                                     GridCells.Adaptive(136.dp),
-                                    Modifier.fillMaxWidth().height(220.dp).testTag("local-photos"),
+                                    state = grid,
+                                    modifier = Modifier.fillMaxWidth().height(220.dp).testTag("local-photos"),
                                     contentPadding = PaddingValues(8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -142,14 +168,21 @@ fun PhotoGalleryScreen(
                                         key = { _, p -> p.uri.toString() },
                                         contentType = { _, _ -> "photo" },
                                     ) { index, photo ->
+                                        val requester = remember(photo.uri) { FocusRequester() }
+                                        DisposableEffect(photo.uri) {
+                                            requesters[photo.uri] = requester
+                                            onDispose { requesters.remove(photo.uri) }
+                                        }
                                         var focused by remember(photo.uri) { mutableStateOf(false) }
                                         val interactions =
                                             remember(photo.uri) { MutableInteractionSource() }
                                         val pressed by interactions.collectIsPressedAsState()
                                         val image =
                                             remember(photo.uri) {
+                                                val thumbnail = LocalPhotoThumbnail(photo.uri)
                                                 ImageRequest.Builder(context)
-                                                    .data(photo.uri)
+                                                    .data(thumbnail)
+                                                    .memoryCacheKey(thumbnail.cacheKey)
                                                     .size(240, 135)
                                                     .precision(coil3.size.Precision.INEXACT)
                                                     .build()
@@ -167,16 +200,26 @@ fun PhotoGalleryScreen(
                                                 Modifier.fillMaxSize(),
                                                 shape = RoundedCornerShape(12.dp),
                                             ) {
-                                                AsyncImage(
-                                                    image,
-                                                    null,
-                                                    Modifier.fillMaxSize(),
-                                                    contentScale = ContentScale.Crop,
-                                                )
+                                                Box(
+                                                    Modifier.fillMaxSize().background(DesignTokens.surface),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    LauncherIcon(LauncherSymbol.WALLPAPER, DesignTokens.secondary)
+                                                    AsyncImage(
+                                                        image,
+                                                        null,
+                                                        Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop,
+                                                    )
+                                                }
                                             }
                                             Box(
                                                 Modifier.matchParentSize()
-                                                    .onFocusChanged { focused = it.isFocused }
+                                                    .focusRequester(requester)
+                                                    .onFocusChanged {
+                                                        focused = it.isFocused
+                                                        if (focused) selectedUri = photo.uri
+                                                    }
                                                     .then(
                                                         if (index == 0) {
                                                             Modifier.focusRequester(first)
@@ -192,9 +235,7 @@ fun PhotoGalleryScreen(
                                                         indication = null,
                                                         role = Role.Button,
                                                         onClick = {
-                                                            onChoose(
-                                                                photo.uri,
-                                                            )
+                                                            if (onPreview != null) onPreview(photo) else onChoose(photo.uri)
                                                         },
                                                     ),
                                             )
@@ -234,21 +275,18 @@ fun PhotoGalleryScreen(
                         )
                     }
                     if (saving) {
-                        Text(stringResource(R.string.loading), color = DesignTokens.foreground)
+                        Text(stringResource(R.string.wallpaper_applying), color = DesignTokens.foreground)
                     }
                     SettingsRow(
-                        stringResource(R.string.photo_other_source),
-                        { alternatives = !alternatives },
+                        stringResource(R.string.photo_system_picker),
+                        {
+                            returnToPicker = true
+                            onSystemPicker()
+                        },
+                        Modifier.focusRequester(picker).testTag("photo-other-source"),
                         enabled = !saving,
+                        symbol = LauncherSymbol.OPEN,
                     )
-                    if (alternatives) {
-                        SettingsRow(
-                            stringResource(R.string.photo_system_picker),
-                            onSystemPicker,
-                            enabled = !saving,
-                            symbol = LauncherSymbol.OPEN,
-                        )
-                    }
                     SettingsRow(
                         stringResource(R.string.close),
                         { motion.close(onClose) },
@@ -259,22 +297,40 @@ fun PhotoGalleryScreen(
                 }
             }
         }
-        LaunchedEffect(permitted, photos) {
-            if (
-                !permitted ||
-                photos?.availability in
-                listOf(
-                    PhotoAvailability.AVAILABLE,
-                    PhotoAvailability.DENIED,
-                    PhotoAvailability.ERROR,
-                )
-            ) {
+        val ready = LocalWindowInfo.current.isWindowFocused
+        LaunchedEffect(ready, permitted, photos?.availability) {
+            if (!ready) {
+                restorePending = true
+                return@LaunchedEffect
+            }
+            if (!restorePending) return@LaunchedEffect
+            if (returnToPicker) {
                 withFrameNanos {}
-                first.requestFocus()
-            } else {
+                picker.requestFocus()
+                returnToPicker = false
+                restorePending = false
+                return@LaunchedEffect
+            }
+            if (permitted && photos == null) {
                 withFrameNanos {}
                 close.requestFocus()
+                return@LaunchedEffect
             }
+            val entries = photos?.photos.orEmpty()
+            if (permitted && entries.isNotEmpty()) {
+                val index = entries.indexOfFirst { it.uri == selectedUri }.coerceAtLeast(0)
+                grid.scrollToItem(index)
+                withFrameNanos {}
+                (awaitRegisteredFocus { requesters[entries[index].uri] } ?: close).requestFocus()
+            } else {
+                withFrameNanos {}
+                if (!permitted || photos?.availability in listOf(PhotoAvailability.DENIED, PhotoAvailability.ERROR)) {
+                    first.requestFocus()
+                } else {
+                    close.requestFocus()
+                }
+            }
+            restorePending = false
         }
     }
 }

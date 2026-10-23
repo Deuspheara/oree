@@ -171,6 +171,10 @@ class ProfilePanelTest {
         }
         compose.onNodeWithTag("profile:first").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionRight)
+        }
+        compose.onNodeWithTag("profile-active:first", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("profile-active:second", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("profile:second").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionCenter)
         }
         compose.runOnIdle { assertEquals("second", selected) }

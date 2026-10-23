@@ -7,6 +7,7 @@ import fr.deuspheara.oree.core.model.CatalogSort
 import fr.deuspheara.oree.core.model.ControlId
 import fr.deuspheara.oree.core.model.ControlPosition
 import fr.deuspheara.oree.core.model.ControlSize
+import fr.deuspheara.oree.core.model.HomeContentLayout
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.LocalProfile
 import fr.deuspheara.oree.core.model.MAX_APP_FOLDERS
@@ -64,6 +65,10 @@ fun encodeProfiles(snapshot: ProfileSnapshot): String {
                 )
                 .put("liquidGlass", v.liquidGlass)
                 .put("glassIntensity", v.glassIntensity)
+                .put("backdropBlur", v.backdropBlur)
+                .put("motionIntensity", v.motionIntensity)
+                .put("setupComplete", v.setupComplete)
+                .put("homeContentLayout", v.homeContentLayout.name)
                 .put("text", v.textScale)
                 .put("sideloaded", v.showSideloaded)
                 .put("context", v.showContext)
@@ -159,6 +164,12 @@ fun decodeProfiles(raw: String): ProfileSnapshot {
                         CatalogSort.valueOf(v.getString("sort")),
                         liquidGlass = v.optBoolean("liquidGlass", true),
                         glassIntensity = v.optDouble("glassIntensity", .75).toFloat(),
+                        backdropBlur = v.optDouble("backdropBlur", 1.0).toFloat(),
+                        motionIntensity = v.optDouble("motionIntensity", 1.0).toFloat(),
+                        setupComplete = v.optBoolean("setupComplete", true),
+                        homeContentLayout = HomeContentLayout.entries.firstOrNull {
+                            it.name == v.optString("homeContentLayout")
+                        } ?: HomeContentLayout.BELOW_DOCK,
                         accent =
                             AccentColor.entries.firstOrNull {
                                 it.name == v.optString("accent")

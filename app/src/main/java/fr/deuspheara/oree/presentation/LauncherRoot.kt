@@ -60,6 +60,9 @@ import fr.deuspheara.oree.core.model.ContentSourceId
 import fr.deuspheara.oree.core.model.ControlPosition
 import fr.deuspheara.oree.core.model.LauncherPreferences
 import fr.deuspheara.oree.core.model.LocalPhoto
+import fr.deuspheara.oree.core.model.LocalPhotos
+import fr.deuspheara.oree.core.model.MAX_DOCK_FAVORITES
+import fr.deuspheara.oree.core.model.PhotoAvailability
 import fr.deuspheara.oree.core.model.QualityTier
 import fr.deuspheara.oree.core.model.TvApp
 import fr.deuspheara.oree.core.model.TvInputs
@@ -79,6 +82,7 @@ import fr.deuspheara.oree.core.platform.launch.resolveContent
 import fr.deuspheara.oree.core.platform.status.ControlStatus
 import fr.deuspheara.oree.core.platform.status.controlStatus
 import fr.deuspheara.oree.feature.home.presentation.component.AppContextMenu
+import fr.deuspheara.oree.feature.home.presentation.component.FolderAddAppsPanel
 import fr.deuspheara.oree.feature.home.presentation.component.FolderDestinationPanel
 import fr.deuspheara.oree.feature.home.presentation.component.FolderPanel
 import fr.deuspheara.oree.feature.home.presentation.component.FolderRenamePanel
@@ -88,6 +92,7 @@ import fr.deuspheara.oree.feature.home.presentation.state.HomeControl
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.HomeViewModel
 import fr.deuspheara.oree.feature.home.presentation.viewmodel.OrganizationWriteStatus
 import fr.deuspheara.oree.feature.profiles.presentation.route.PhotoGalleryPanel
+import fr.deuspheara.oree.feature.profiles.presentation.route.PhotoViewerRoute
 import fr.deuspheara.oree.feature.profiles.presentation.route.ProfilesRoute
 import fr.deuspheara.oree.feature.profiles.presentation.screen.WallpaperPanel
 import fr.deuspheara.oree.feature.profiles.presentation.viewmodel.ProfilesViewModel
@@ -101,9 +106,13 @@ import fr.deuspheara.oree.feature.settings.presentation.component.CommandPanel
 import fr.deuspheara.oree.feature.settings.presentation.route.AmbientRoute
 import fr.deuspheara.oree.feature.settings.presentation.route.ContentCapabilitiesPanel
 import fr.deuspheara.oree.feature.settings.presentation.screen.SettingsScreen
+import fr.deuspheara.oree.feature.settings.presentation.screen.VisualExperienceScreen
 import fr.deuspheara.oree.feature.settings.presentation.state.AmbientSettingsState
 import fr.deuspheara.oree.feature.settings.presentation.state.BackupSettingsState
 import fr.deuspheara.oree.feature.settings.presentation.state.ContentSettingsState
+import fr.deuspheara.oree.feature.settings.presentation.state.ExperienceAction
+import fr.deuspheara.oree.feature.settings.presentation.state.ExperienceControl
+import fr.deuspheara.oree.feature.settings.presentation.state.ExperienceSaveStatus
 import fr.deuspheara.oree.feature.settings.presentation.state.SettingsAction
 import fr.deuspheara.oree.feature.settings.presentation.state.SettingsCategory
 import fr.deuspheara.oree.feature.settings.presentation.state.SettingsControl
@@ -177,7 +186,10 @@ fun LauncherRoot(
             importProgress?.takeIf { it.profileId == profile?.id }?.status == WallpaperImportStatus.FAILED
     LaunchedEffect(importProgress) {
         if (importProgress?.status == WallpaperImportStatus.COMPLETED) {
-            if (importProgress?.profileId == profile?.id) photoGalleryOpen = false
+            if (importProgress?.profileId == profile?.id) {
+                photoGalleryOpen = false
+                wallpaperOpen = false
+            }
             launcher.clearImportResult()
         }
     }
@@ -196,6 +208,10 @@ fun LauncherRoot(
                 feed.entries.filter { it.source in installed }
             }
         }
+    val homeContent = remember(selection.homeEntries, state.apps) {
+        val installed = state.apps.mapTo(hashSetOf()) { it.packageName }
+        selection.homeEntries.filter { it.source in installed }
+    }
     val dynamic =
         when (profile?.wallpaper) {
             WallpaperMode.APPLICATION ->
@@ -207,6 +223,7 @@ fun LauncherRoot(
 
             WallpaperMode.CONTENT ->
                 content.artwork.takeIf { profile.contentEnabled }?.let(android.net.Uri::parse)
+                    ?.takeIf { it.scheme in setOf("content", "android.resource") }
 
             else -> null
         }
@@ -235,6 +252,8 @@ fun LauncherRoot(
     var openFolder by navigation.openFolder
     var renameFolder by navigation.renameFolder
     var folderDestination by remember(profile?.id) { mutableStateOf<TvApp?>(null) }
+    var addToFolder by rememberSaveable(profile?.id) { mutableStateOf<String?>(null) }
+    var manageFolder by rememberSaveable(profile?.id) { mutableStateOf(false) }
     var folderMoveApp by remember(profile?.id) { mutableStateOf<String?>(null) }
     var searchOpen by navigation.searchOpen
     var searchQuery by navigation.searchQuery
@@ -247,7 +266,8 @@ fun LauncherRoot(
     val backupFailed = backupState.status == BackupStatus.FAILED
     val backupReview = backupState.review
     var ambientOpen by remember(profile?.id) { mutableStateOf(false) }
-    var photoPreview by remember(profile?.id) { mutableStateOf<LocalPhoto?>(null) }
+    var photoPreviewData by rememberSaveable(profile?.id) { mutableStateOf<List<String>?>(null) }
+    val photoPreview = photoPreviewData?.let { LocalPhoto(it[0], it[1]) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(profiles) {
         profiles
@@ -271,6 +291,8 @@ fun LauncherRoot(
     var controlsEditing by remember { mutableStateOf(false) }
     var restoreEpoch by remember { mutableIntStateOf(0) }
     val holder = rememberSaveableStateHolder()
+    var settingsStateKey by rememberSaveable { mutableStateOf("settings-entry") }
+
     val context = LocalContext.current
     val activity = androidx.activity.compose.LocalActivity.current
     LaunchedEffect(resume) { systemActions.resumed() }
@@ -308,10 +330,18 @@ fun LauncherRoot(
     }
     val uninstall = remember(context) { AppUninstall(context.applicationContext) }
     val exportBackup = rememberLauncherForActivityResult(CreateLocalBackup()) { uri ->
-        uri?.let { settingsViewModel.export(it.toString()) }
+        if (uri != null) {
+            settingsViewModel.export(uri.toString())
+        } else {
+            Toast.makeText(context, R.string.backup_picker_cancelled, Toast.LENGTH_SHORT).show()
+        }
     }
     val importBackup = rememberLauncherForActivityResult(OpenLocalBackup()) { uri ->
-        uri?.let { settingsViewModel.review(it.toString()) }
+        if (uri != null) {
+            settingsViewModel.review(uri.toString())
+        } else {
+            Toast.makeText(context, R.string.backup_picker_cancelled, Toast.LENGTH_SHORT).show()
+        }
     }
     LaunchedEffect(backupState.status) {
         if (backupState.status == BackupStatus.EXPORTED) {
@@ -378,6 +408,13 @@ fun LauncherRoot(
         }
     val loader = remember(context) { SingletonImageLoader.get(context) }
     var cacheBytes by remember { mutableLongStateOf(loader.memoryCache?.size ?: 0L) }
+    fun openSettings(category: SettingsCategory) {
+        holder.removeState(settingsStateKey)
+        settingsStateKey = "settings:${java.util.UUID.randomUUID()}"
+        settingsCategory = category
+        settingsOpen = true
+        cacheBytes = loader.memoryCache?.size ?: 0L
+    }
     fun closeSettings() {
         settingsOpen = false
         if (returnToSearch) {
@@ -423,7 +460,7 @@ fun LauncherRoot(
             androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_STOP) {
                     ambientOpen = false
-                    photoPreview = null
+                    photoPreviewData = null
                     if (home.writing.value?.status != OrganizationWriteStatus.SAVING) {
                         favoriteMove = null
                         folderMoveApp = null
@@ -477,6 +514,31 @@ fun LauncherRoot(
             }
         }
     }
+    var commandBackdrop by remember { mutableStateOf<WallpaperFrame?>(null) }
+    fun showCommands(customizing: Boolean = false) {
+        if (commands || menuCapturePending) return
+        val requestProfile = profile?.id
+        menuCapturePending = true
+        menuCaptureJob = scope.launch {
+            try {
+                val captured = if (customizing || !active.liquidGlass || active.reduceTransparency ||
+                    active.highContrast || active.quality == QualityTier.ECONOMY
+                ) {
+                    null
+                } else {
+                    activity?.let { captureMenuBackdrop(it) }
+                }
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && profile?.id == requestProfile) {
+                    commandBackdrop = captured
+                    customizeControls = customizing
+                    commands = true
+                }
+            } finally {
+                menuCapturePending = false
+            }
+        }
+    }
+    LaunchedEffect(commands) { if (!commands) commandBackdrop = null }
     fun openContent(entry: ContentEntry) {
         scope.launch {
             val request = resolveContent(context, entry.intentUri, entry.source)
@@ -486,12 +548,14 @@ fun LauncherRoot(
         }
     }
     ReportDrawnWhen { stored != null && organization != null && !state.loading }
+    var catalogBackdrop by remember { mutableStateOf(false) }
     val glassSource = dev.chrisbanes.haze.rememberHazeState()
     val materialPreferences = active
     LauncherTheme(materialPreferences) {
         CompositionLocalProvider(
             LocalArtworkReflections provides artworkReflections,
             LocalOpaquePanels provides settingsOpen,
+            fr.deuspheara.oree.core.designsystem.glass.LocalSettingsPage provides settingsOpen,
             LocalGlassSource provides glassSource,
             LocalLiquidGlass provides materialPreferences.liquidGlass,
             LocalGlassIntensity provides materialPreferences.glassIntensity,
@@ -502,14 +566,22 @@ fun LauncherRoot(
                         materialPreferences.quality == QualityTier.ECONOMY
                     ),
             LocalHighContrast provides materialPreferences.highContrast,
+            fr.deuspheara.oree.core.designsystem.artwork.LocalMotionIntensity provides materialPreferences.motionIntensity,
         ) {
             Box(Modifier.fillMaxSize()) {
-                if (!settingsOpen) {
+                val wallpaperSoftened =
+                    catalogBackdrop || settingsOpen || openFolder != null || wallpaperOpen || photoGalleryOpen
+                run {
                     WallpaperBackground(
                         remember(frame) { frame?.image?.asImageBitmap() },
                         active.reduceMotion ||
                             systemReduced ||
                             active.quality == QualityTier.ECONOMY,
+                        frost = remember(frame) { frame?.frost?.asImageBitmap() },
+                        softened = wallpaperSoftened,
+                        blurAmount = active.backdropBlur,
+                        // Settings chrome is opaque material; its visible preview owns a separate source.
+                        sampleForGlass = !settingsOpen,
                     )
                 }
                 if (initializationFailed || profiles?.failed == true) {
@@ -524,20 +596,52 @@ fun LauncherRoot(
                     }
                     return@Box
                 }
-                if (!settingsOpen) {
+                if (profile != null && stored?.setupComplete == false) {
+                    key(profile.id) {
+                        VisualExperienceScreen(
+                            stored,
+                            welcome = true,
+                            systemReducedMotion = systemReduced,
+                            saveStatus = when {
+                                preferenceState?.status == PreferenceSaveStatus.FAILED -> ExperienceSaveStatus.FAILED
+                                preferenceState?.value?.setupComplete == true -> ExperienceSaveStatus.SAVING
+                                else -> ExperienceSaveStatus.IDLE
+                            },
+                            controls = setOf(ExperienceControl.KEEP_CURRENT),
+                            onAction = { action ->
+                                when (action) {
+                                    is ExperienceAction.Apply -> settingsViewModel.setPreferences(
+                                        profile.id,
+                                        action.value.copy(setupComplete = true),
+                                    )
+
+                                    ExperienceAction.KeepCurrent -> settingsViewModel.setPreferences(
+                                        profile.id,
+                                        stored.copy(setupComplete = true),
+                                    )
+
+                                    ExperienceAction.Retry -> settingsViewModel.retryPreferences(profile.id)
+
+                                    ExperienceAction.Cancel -> Unit
+                                }
+                            },
+                        )
+                    }
+                    return@Box
+                }
+                CompositionLocalProvider(LocalOpaquePanels provides false) {
                     holder.SaveableStateProvider("home:${profile?.id}") {
                         HomeScreen(
+                            onBackdropChanged = { catalogBackdrop = it },
                             appPreviewsEnabled = profile?.appPreviewsEnabled == true,
                             folders = profile?.folders.orEmpty(),
                             movingFavorite = favoriteMove?.appId,
                             moveSaving = organizationSaving,
                             moveFailed = organizationWriteFailed,
-                            retainDock = frame != null &&
-                                profile?.wallpaper in
-                                listOf(WallpaperMode.LANDSCAPE, WallpaperMode.PERSONAL),
                             sourceKey = frame,
                             hideCards = controlsEditing || ambientOpen,
-                            contentEntries = visibleContent,
+                            backgroundOnly = settingsOpen || openFolder != null || searchOpen || photoGalleryOpen,
+                            contentEntries = homeContent,
                             state = if (stored == null || organization == null) {
                                 state.copy(loading = true)
                             } else {
@@ -549,26 +653,25 @@ fun LauncherRoot(
                             systemReduceMotion = systemReduced,
                             favorites = favoriteMove?.draft ?: organization?.favorites.orEmpty(),
                             profile = profile,
-                            controls = setOf(HomeControl.SEARCH, HomeControl.COMMANDS, HomeControl.PROFILES, HomeControl.APP_MENU),
+                            controls = setOf(
+                                HomeControl.SEARCH,
+                                HomeControl.PROFILES,
+                                HomeControl.APP_MENU,
+                            ),
                             onAction = { action ->
                                 when (action) {
                                     is HomeAction.OpenApp -> {
                                         onOpen(action.app)
                                     }
 
-                                    HomeAction.OpenSettings -> {
-                                        settingsCategory = SettingsCategory.APPEARANCE
-                                        settingsOpen = true
-                                        cacheBytes = loader.memoryCache?.size ?: 0L
-                                    }
+                                    HomeAction.OpenSettings -> openSettings(SettingsCategory.APPEARANCE)
 
                                     HomeAction.Retry -> {
                                         home.reload()
                                     }
 
                                     HomeAction.OpenCommands -> {
-                                        customizeControls = false
-                                        commands = true
+                                        showCommands()
                                     }
 
                                     HomeAction.OpenProfiles -> {
@@ -597,7 +700,12 @@ fun LauncherRoot(
                                                         move.draft,
                                                         move.appId,
                                                         direction,
-                                                        state.apps.mapTo(hashSetOf()) { it.id },
+                                                        orderFavoriteApps(
+                                                            state.apps,
+                                                            move.original,
+                                                        ).take(MAX_DOCK_FAVORITES).mapTo(hashSetOf()) {
+                                                            it.id
+                                                        },
                                                     ),
                                             )
                                         }
@@ -643,6 +751,7 @@ fun LauncherRoot(
                                     is HomeAction.OpenFolder -> {
                                         val it = action.id
                                         openFolder = it
+                                        manageFolder = action.manage
                                         profileEffectFailed = false
                                         launcher.acknowledgeWrite()
                                         home.acknowledgeWrite()
@@ -659,8 +768,9 @@ fun LauncherRoot(
                             },
                         )
                     }
-                } else {
-                    holder.SaveableStateProvider("settings:${profile?.id}") {
+                }
+                if (settingsOpen) {
+                    holder.SaveableStateProvider(settingsStateKey) {
                         val tvInputs by
                             launcher.tvInputs.inputs.collectAsStateWithLifecycle(
                                 initialValue = TvInputs(),
@@ -676,6 +786,8 @@ fun LauncherRoot(
                         SettingsScreen(
                             versionName = BuildConfig.VERSION_NAME,
                             initialCategory = settingsCategory,
+                            initiallyInCategory = returnToSearch,
+                            systemReduceMotion = systemReduced,
                             inputs = tvInputs,
                             value = active,
                             cacheBytes = cacheBytes,
@@ -743,8 +855,7 @@ fun LauncherRoot(
                                     }
 
                                     SettingsAction.CustomizeControls -> {
-                                        customizeControls = true
-                                        commands = true
+                                        showCommands(customizing = true)
                                     }
 
                                     SettingsAction.Wallpaper -> {
@@ -913,16 +1024,16 @@ fun LauncherRoot(
                         )
                     }
                 }
-                if (searchOpen) {
+                if (searchOpen && !wallpaperOpen && !photoGalleryOpen && !profilesOpen) {
                     holder.SaveableStateProvider("search:${profile?.id}") {
                         val systemSearchAvailable by
                             produceState(false, resume) {
                                 value = resolveSystemSearch(context) != null
                             }
-                        val photos by
-                            produceState<List<LocalPhoto>>(emptyList(), profile?.id, lifecycle) {
+                        val photoSnapshot by
+                            produceState<LocalPhotos?>(null, profile?.id, lifecycle) {
                                 lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                                    value = launcher.localPhotos.load().photos
+                                    value = launcher.localPhotos.load()
                                     kotlinx.coroutines.awaitCancellation()
                                 }
                             }
@@ -982,16 +1093,33 @@ fun LauncherRoot(
                                 actions,
                                 visibleContent,
                                 profile?.favorites.orEmpty(),
-                                photos,
+                                photoSnapshot?.photos.orEmpty(),
                             ),
                             { searchQuery = it },
                             restoreEpoch + resume,
                             active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                            sourceKey = remember(frame, wallpaperSoftened) { frame to wallpaperSoftened },
+                            sourceStatus = listOfNotNull(
+                                if (photoSnapshot?.availability in listOf(PhotoAvailability.DENIED, PhotoAvailability.ERROR)) {
+                                    androidx.compose.ui.res.stringResource(R.string.search_photos_unavailable)
+                                } else {
+                                    null
+                                },
+                                if (
+                                    feed.availability in listOf(ContentAvailability.DENIED, ContentAvailability.ERROR) ||
+                                    feed.sources.values.any { it in listOf(ContentAvailability.DENIED, ContentAvailability.ERROR) }
+                                ) {
+                                    androidx.compose.ui.res.stringResource(R.string.search_content_unavailable)
+                                } else {
+                                    null
+                                },
+                            ).joinToString(" · ").takeIf { it.isNotEmpty() },
                             onSelect = { item ->
                                 when (item) {
                                     is SearchItem.App -> onOpen(item.app)
 
                                     is SearchItem.Folder -> {
+                                        manageFolder = false
                                         openFolder = item.folder.id
                                         profileEffectFailed = false
                                         launcher.acknowledgeWrite()
@@ -1011,7 +1139,7 @@ fun LauncherRoot(
                                                 it > 0
                                             } == true
                                         ) {
-                                            photoPreview = item.photo
+                                            photoPreviewData = listOf(item.photo.uri, item.photo.name)
                                         }
                                     }
 
@@ -1034,12 +1162,9 @@ fun LauncherRoot(
                                             SearchAction.ANDROID_SETTINGS -> onAndroidSettings()
 
                                             else -> {
-                                                settingsCategory =
-                                                    SettingsCategory.valueOf(item.action.name)
                                                 returnToSearch = true
                                                 searchOpen = false
-                                                settingsOpen = true
-                                                cacheBytes = loader.memoryCache?.size ?: 0L
+                                                openSettings(SettingsCategory.valueOf(item.action.name))
                                             }
                                         }
                                 }
@@ -1091,6 +1216,13 @@ fun LauncherRoot(
                             folderMoveApp,
                             onOpen,
                             ::showAppMenu,
+                            initiallyManaging = manageFolder,
+                            onAddApps = {
+                                addToFolder = folder.id
+                                profileEffectFailed = false
+                                launcher.acknowledgeWrite()
+                                home.acknowledgeWrite()
+                            },
                             onRename = {
                                 renameFolder = folder.id
                                 profileEffectFailed = false
@@ -1102,12 +1234,14 @@ fun LauncherRoot(
                                     changeProfile {
                                         home.deleteFolder(id, folder.id)
                                         openFolder = null
+                                        manageFolder = false
                                         restoreEpoch++
                                     }
                                 }
                             },
                             onClose = {
                                 openFolder = null
+                                manageFolder = false
                                 folderMoveApp = null
                                 restoreEpoch++
                             },
@@ -1126,6 +1260,33 @@ fun LauncherRoot(
                             },
                         )
                     }
+                profile?.folders?.firstOrNull { it.id == addToFolder }?.let { folder ->
+                    FolderAddAppsPanel(
+                        folder = folder,
+                        folders = profile?.folders.orEmpty(),
+                        catalog = state.apps,
+                        saving = profileSaving,
+                        failed = profileFailed,
+                        reduced = active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                        sourceKey = remember(frame, wallpaperSoftened) { frame to wallpaperSoftened },
+                        onAdd = { app ->
+                            profile?.id?.let { id ->
+                                changeProfile {
+                                    home.moveToFolder(id, app.id, folder.id)
+                                    addToFolder = null
+                                    restoreEpoch++
+                                }
+                            }
+                        },
+                        onClose = {
+                            addToFolder = null
+                            profileEffectFailed = false
+                            launcher.acknowledgeWrite()
+                            home.acknowledgeWrite()
+                            restoreEpoch++
+                        },
+                    )
+                }
                 folderDestination?.let { target ->
                     profile?.let { p ->
                         FolderDestinationPanel(
@@ -1133,6 +1294,8 @@ fun LauncherRoot(
                             p.folders.firstOrNull { target.id in it.apps }?.id,
                             profileSaving,
                             profileFailed,
+                            reduced = active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                            sourceKey = remember(frame, wallpaperSoftened) { frame to wallpaperSoftened },
                             onMove = { id ->
                                 changeProfile {
                                     home.moveToFolder(p.id, target.id, id)
@@ -1165,6 +1328,8 @@ fun LauncherRoot(
                             folder,
                             profileSaving,
                             profileFailed,
+                            reduced = active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                            sourceKey = remember(frame, wallpaperSoftened) { frame to wallpaperSoftened },
                             onSave = { name ->
                                 profile?.id?.let { id ->
                                     changeProfile {
@@ -1199,6 +1364,7 @@ fun LauncherRoot(
                                 (
                                     {
                                         appMenu = null
+                                        manageFolder = false
                                         openFolder = memberFolder.id
                                         folderMoveApp = target.app.id
                                         restoreEpoch++
@@ -1333,6 +1499,7 @@ fun LauncherRoot(
                         anchor = target.anchor,
                         awaitingOpeningRelease = target.awaitingRelease,
                         favorite = target.app.id in organization?.favorites.orEmpty(),
+                        canAddFavorite = organization?.favorites.orEmpty().distinct().size < MAX_DOCK_FAVORITES,
                         saving = organizationSaving,
                         failed = organizationWriteFailed,
                         reduceMotion =
@@ -1419,19 +1586,22 @@ fun LauncherRoot(
                     )
                 }
                 photoPreview?.let { photo ->
-                    AmbientRoute(
-                        frame,
-                        false,
-                        false,
-                        active.reduceMotion ||
-                            systemReduced ||
-                            active.quality == QualityTier.ECONOMY,
-                        launcher.localPhotos::load,
+                    PhotoViewerRoute(
+                        initial = photo,
+                        reduced = active.reduceMotion || systemReduced || active.quality == QualityTier.ECONOMY,
+                        loadPhotos = launcher.localPhotos::load,
                         onClose = {
-                            photoPreview = null
+                            photoPreviewData = null
                             restoreEpoch++
                         },
-                        photo = android.net.Uri.parse(photo.uri),
+                        onWallpaper = if (photoGalleryOpen && profile != null) {
+                            { selected ->
+                                importPhoto(android.net.Uri.parse(selected.uri), profile.id)
+                                photoPreviewData = null
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
                 if (commands) {
@@ -1439,6 +1609,7 @@ fun LauncherRoot(
                     val controlStatus by
                         statusFlow.collectAsStateWithLifecycle(initialValue = ControlStatus())
                     CommandPanel(
+                        backdrop = remember(commandBackdrop) { commandBackdrop?.image?.asImageBitmap() },
                         sourceKey = frame,
                         onEditingChanged = { controlsEditing = it },
                         status = controlStatus,
@@ -1467,9 +1638,7 @@ fun LauncherRoot(
                         reduceTransparency = active.reduceTransparency,
                         onSettings = {
                             commands = false
-                            settingsCategory = SettingsCategory.APPEARANCE
-                            cacheBytes = loader.memoryCache?.size ?: 0L
-                            settingsOpen = true
+                            openSettings(SettingsCategory.APPEARANCE)
                         },
                         onWallpaper = {
                             commands = false
@@ -1478,15 +1647,18 @@ fun LauncherRoot(
                             launcher.acknowledgeWrite()
                             home.acknowledgeWrite()
                         },
+                        onAdjustVolume = { direction ->
+                            if (systemActions.adjustMediaVolume(direction) != true) {
+                                Toast.makeText(context, R.string.settings_error, Toast.LENGTH_LONG).show()
+                            }
+                        },
                         onNetwork = {
-                            commands = false
                             if (systemActions.network() != true) {
                                 Toast.makeText(context, R.string.settings_error, Toast.LENGTH_LONG)
                                     .show()
                             }
                         },
                         onAudio = {
-                            commands = false
                             if (systemActions.audio() != true) {
                                 Toast.makeText(context, R.string.settings_error, Toast.LENGTH_LONG)
                                     .show()
@@ -1526,6 +1698,7 @@ fun LauncherRoot(
                                 systemReduced ||
                                 active.quality == QualityTier.ECONOMY,
                         loadPhotos = launcher.localPhotos::load,
+                        requestOnOpen = false,
                         sourceKey = frame,
                         saving = profileSaving,
                         failed = profileFailed,

@@ -1,6 +1,5 @@
 package fr.deuspheara.oree.benchmark
 
-import android.app.UiAutomation
 import android.os.SystemClock
 import android.util.Log
 import android.view.InputDevice
@@ -16,9 +15,7 @@ import java.io.File
 
 /** Ordinary remote events; no touch/accessibility action substitutes for D-pad activation. */
 fun remoteKey(code: Int, longPress: Boolean = false, pauseMillis: Long = 120) {
-    val automation =
-        InstrumentationRegistry.getInstrumentation()
-            .getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
     val down = SystemClock.uptimeMillis()
     fun inject(action: Int, repeat: Int = 0, flags: Int = 0) {
         check(
@@ -82,9 +79,15 @@ private fun MacrobenchmarkScope.awaitFocusedApp(): String {
 }
 
 /** Bounded fresh hierarchy traversal; never infer input focus from a cached selector or pixels. */
-private fun MacrobenchmarkScope.focusedTag(): String? {
-    val automation = InstrumentationRegistry.getInstrumentation()
-        .getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+internal fun MacrobenchmarkScope.focusedTag(): String? {
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    return readFocusedResource(automation)
+}
+
+/** Snapshot query only; never called from a timed key burst. */
+internal fun readFocusedResource(automation: android.app.UiAutomation): String? {
+    val freshRoot = android.os.Build.VERSION.SDK_INT >= 34
+    if (freshRoot) automation.clearCache()
     val pending = java.util.ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
     automation.rootInActiveWindow?.let(pending::add)
     var visited = 0
@@ -95,8 +98,8 @@ private fun MacrobenchmarkScope.focusedTag(): String? {
         while (pending.isNotEmpty() && visited++ < 1_000) {
             val node = pending.removeFirst()
             try {
-                if (!node.refresh()) continue
-                if (node.isFocused) return node.viewIdResourceName
+                if (!freshRoot && !node.refresh()) continue
+                if (node.isFocused && node.viewIdResourceName != null) return node.viewIdResourceName
                 repeat(node.childCount) { index -> node.getChild(index)?.let(pending::add) }
             } finally {
                 release(node)
@@ -160,9 +163,9 @@ private fun MacrobenchmarkScope.rowEdge(key: Int) {
     error("Row edge not reached within bounded navigation")
 }
 
-private fun MacrobenchmarkScope.header(tag: String) {
-    returnToLauncherHome()
-    val controls = setOf("search", "commands", "profiles")
+internal fun MacrobenchmarkScope.header(tag: String, closePanels: Boolean = true) {
+    if (closePanels) returnToLauncherHome()
+    val controls = setOf("overview", "search", "commands", "profiles")
     var reached = false
     for (step in 0 until 80) {
         if (focusedTag() in controls) {

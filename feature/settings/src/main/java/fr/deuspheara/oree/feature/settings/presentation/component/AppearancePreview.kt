@@ -2,7 +2,6 @@
 
 package fr.deuspheara.oree.feature.settings.presentation.component
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.focused
@@ -47,6 +49,8 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import fr.deuspheara.oree.core.designsystem.R
@@ -119,8 +123,17 @@ fun AccentSelector(selected: AccentColor, onSelect: (AccentColor) -> Unit) {
 
 /** Isolated source/effect: settings chrome stays opaque, only this sample renders glass. */
 @Composable
-fun GlassIntensityPreview(preferences: LauncherPreferences) {
+fun GlassIntensityPreview(preferences: LauncherPreferences, previewFocus: Int? = null, reducedMotion: Boolean = false) {
     val source = rememberHazeState()
+    var visible by remember { mutableStateOf(false) }
+    val window = LocalWindowInfo.current.containerSize
+    val context = LocalContext.current
+    val request = remember(context) {
+        ImageRequest.Builder(context)
+            .data(fr.deuspheara.oree.core.platform.R.drawable.landscape_forest)
+            .size(1280, 720)
+            .build()
+    }
     val opaque =
         preferences.reduceTransparency ||
             preferences.highContrast ||
@@ -136,33 +149,75 @@ fun GlassIntensityPreview(preferences: LauncherPreferences) {
             Modifier.fillMaxWidth()
                 .height(154.dp)
                 .clip(RoundedCornerShape(18.dp))
-                .testTag("glass-preview"),
+                .testTag("glass-preview")
+                .onGloballyPositioned {
+                    val bounds = it.boundsInWindow()
+                    visible = bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.top < window.height
+                },
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                painterResource(fr.deuspheara.oree.core.platform.R.drawable.landscape_forest),
-                null,
-                Modifier.fillMaxSize()
-                    .then(
-                        if (preferences.liquidGlass && !opaque) {
-                            Modifier.hazeSource(source)
-                        } else {
-                            Modifier
-                        },
-                    ),
-                contentScale = ContentScale.Crop,
-            )
-            Row(
-                Modifier.glassSurface(radius = 28.dp).padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LauncherIcon(LauncherSymbol.NETWORK, DesignTokens.accent)
-                Text(
-                    stringResource(R.string.glass_preview),
-                    color = DesignTokens.foreground,
-                    fontSize = 16.sp,
+            if (visible) {
+                AsyncImage(
+                    request,
+                    null,
+                    Modifier.fillMaxSize()
+                        .then(
+                            if (visible && preferences.liquidGlass && !opaque) {
+                                Modifier.hazeSource(source)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    contentScale = ContentScale.Crop,
                 )
+                if (previewFocus == null) {
+                    Row(
+                        Modifier.glassSurface(radius = 28.dp).padding(horizontal = 24.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LauncherIcon(LauncherSymbol.NETWORK, DesignTokens.accent)
+                        Text(
+                            stringResource(R.string.glass_preview),
+                            color = DesignTokens.foreground,
+                            fontSize = 16.sp,
+                        )
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.CenterVertically) {
+                        repeat(2) { index ->
+                            fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork(
+                                previewFocus == index,
+                                false,
+                                reducedMotion,
+                                androidx.compose.ui.geometry.Offset.Zero,
+                                Modifier.size(width = 150.dp, height = 84.dp),
+                                focusSpec = androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 260f),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxSize().glassSurface(radius = 18.dp).padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    LauncherIcon(if (index == 0) LauncherSymbol.HOME else LauncherSymbol.PROFILE, DesignTokens.accent)
+                                    Text(
+                                        stringResource(
+                                            if (index ==
+                                                0
+                                            ) {
+                                                R.string.experience_sample_apps
+                                            } else {
+                                                R.string.experience_sample_glass
+                                            },
+                                        ),
+                                        color = DesignTokens.foreground,
+                                        fontSize = 15.sp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

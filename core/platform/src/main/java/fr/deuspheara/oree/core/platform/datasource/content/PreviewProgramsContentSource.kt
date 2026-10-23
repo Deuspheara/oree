@@ -3,7 +3,6 @@ package fr.deuspheara.oree.core.platform.datasource.content
 import android.content.Context
 import android.database.Cursor
 import android.media.tv.TvContract
-import android.net.Uri
 import android.os.CancellationSignal
 import fr.deuspheara.oree.core.domain.concurrency.AppDispatchers
 import fr.deuspheara.oree.core.domain.source.ContentSource
@@ -41,19 +40,24 @@ class PreviewProgramsContentSource(
                             "weight",
                         )
                     val rows = mutableListOf<Pair<ContentEntry, Long>>()
-                    val cursor =
-                        if (query != null) {
-                            query.invoke(fields, signal)
-                        } else {
-                            context.contentResolver.query(
-                                TvContract.PreviewPrograms.CONTENT_URI,
-                                fields,
-                                null,
-                                null,
-                                "weight DESC, _id DESC",
-                                signal,
-                            )
-                        }
+                    val metadataFields = fields + "thumbnail_uri"
+                    fun read(projection: Array<String>) = if (query != null) {
+                        query.invoke(projection, signal)
+                    } else {
+                        context.contentResolver.query(
+                            TvContract.PreviewPrograms.CONTENT_URI,
+                            projection,
+                            null,
+                            null,
+                            "weight DESC, _id DESC",
+                            signal,
+                        )
+                    }
+                    val cursor = try {
+                        read(metadataFields)
+                    } catch (_: IllegalArgumentException) {
+                        read(fields)
+                    }
                     var seen = 0
                     cursor?.use { c ->
                         while (seen++ < 200 && c.moveToNext()) {
@@ -73,21 +77,15 @@ class PreviewProgramsContentSource(
                             ) {
                                 continue
                             }
-                            val art =
-                                c.getString(3)
-                                    ?.takeIf {
-                                        it.length <= 4096 && it.none(Char::isISOControl)
-                                    }
-                                    ?.let(Uri::parse)
-                                    ?.takeIf {
-                                        it.scheme in listOf("content", "android.resource")
-                                    }
+                            val art = contentArtworkUri(c.getString(3))
+                                ?: c.getColumnIndex("thumbnail_uri").takeIf { it >= 0 && !c.isNull(it) }
+                                    ?.let { contentArtworkUri(c.getString(it)) }
                             rows +=
                                 ContentEntry(
                                     "preview:$publisher:${c.getLong(0)}",
                                     title,
                                     publisher,
-                                    art?.toString(),
+                                    art,
                                     link,
                                     null,
                                     ContentSourceId.PREVIEW,

@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.coroutines)
     implementation(libs.datastore)
     implementation(libs.coil)
+    implementation(libs.coil.network.okhttp)
     debugImplementation(libs.compose.tooling)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.compose.bom))

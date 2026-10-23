@@ -22,11 +22,13 @@ fun SearchRoute(
     onAppMenu: (TvApp, Rect, Boolean) -> Unit,
     onClose: () -> Unit,
     onSystemSearch: ((String) -> Unit)? = null,
+    sourceStatus: String? = null,
+    sourceKey: Any? = null,
 ) {
     LaunchedEffect(request) { model.search(request) }
     val state by model.state.collectAsStateWithLifecycle()
     SearchPanel(
         request.query, onQuery, resume, reduced, onSelect, onAppMenu, onClose,
-        state.takeIf { it.request == request }?.results, onSystemSearch,
+        state.takeIf { it.request == request }?.results, onSystemSearch, sourceStatus, sourceKey,
     )
 }

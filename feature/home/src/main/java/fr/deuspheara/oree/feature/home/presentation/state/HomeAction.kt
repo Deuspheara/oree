@@ -5,7 +5,7 @@ import fr.deuspheara.oree.core.model.ContentEntry
 import fr.deuspheara.oree.core.model.TvApp
 
 /** Available header/menu affordances are independent from their event delivery. */
-enum class HomeControl { COMMANDS, PROFILES, SEARCH, APP_MENU }
+enum class HomeControl { COMMANDS, PROFILES, SEARCH, APP_MENU, OVERVIEW }
 
 /** Screen intentions only; per-card focus, press, tilt and scrolling stay in Compose. */
 sealed interface HomeAction {
@@ -19,7 +19,7 @@ sealed interface HomeAction {
     data class MoveFavorite(val direction: Int) : HomeAction
     data object CommitMove : HomeAction
     data object CancelMove : HomeAction
-    data class OpenFolder(val id: String) : HomeAction
+    data class OpenFolder(val id: String, val manage: Boolean = false) : HomeAction
     data object OpenSearch : HomeAction
     data class OpenAppMenu(val app: TvApp, val anchor: Rect, val awaitingRelease: Boolean) : HomeAction
 }

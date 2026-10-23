@@ -13,6 +13,7 @@ data class TvApp(
     val artwork: Int,
     val artworkVersion: Long = 0L,
     val artworkKind: ArtworkKind = ArtworkKind.BANNER,
+    val icon: Int = 0,
 ) {
     val artworkCacheKey: String
         get() = "$packageName/$artwork@$artworkVersion"

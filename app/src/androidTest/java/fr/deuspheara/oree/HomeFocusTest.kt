@@ -699,7 +699,7 @@ class HomeFocusTest {
     }
 
     @Test
-    fun overflowingDockScrollsAndRestoresItsLastFavorite() {
+    fun fullDockRestoresItsLastFavorite() {
         val catalog = (1..14).map { TvApp("Item$it", "fixture", "Item$it", 0) }
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
@@ -707,7 +707,7 @@ class HomeFocusTest {
                     state = HomeUiState(catalog, false),
                     resume = 0,
                     reduceMotion = true,
-                    favorites = catalog.take(8).map { it.id },
+                    favorites = catalog.take(6).map { it.id },
                     onAction = { action ->
                         when (action) {
                             else -> Unit
@@ -718,13 +718,13 @@ class HomeFocusTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("app:Item1").assertIsFocused()
-        repeat(7) { compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } }
-        compose.onNodeWithTag("app:Item8").assertIsFocused().assertIsDisplayed()
+        repeat(5) { compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } }
+        compose.onNodeWithTag("app:Item6").assertIsFocused().assertIsDisplayed()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("app:Item8").assertIsNotFocused()
+        compose.onNodeWithTag("app:Item6").assertIsNotFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.waitForIdle()
-        compose.onNodeWithTag("app:Item8").assertIsFocused()
+        compose.onNodeWithTag("app:Item6").assertIsFocused()
     }
 
     @Test
@@ -839,6 +839,95 @@ class HomeFocusTest {
     }
 
     @Test
+    fun heldUpReturnStaysAnimatedAndDownInterruptsIt() {
+        val catalog = (1..40).map { TvApp("Card$it", "fixture", "Card$it", 0) }
+        compose.setContent {
+            HazeTestTheme(LauncherPreferences()) {
+                HomeScreen(
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = false,
+                    systemReduceMotion = false,
+                    favorites = listOf("Card1"),
+                    onAction = {},
+                )
+            }
+        }
+        compose.waitForIdle()
+        val initial = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("app:Card1").assertIsFocused()
+        val raised = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val time = android.os.SystemClock.uptimeMillis()
+        compose.mainClock.autoAdvance = false
+        try {
+            instrumentation.sendKeySync(
+                android.view.KeyEvent(time, time, android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_UP, 2),
+            )
+            compose.mainClock.advanceTimeBy(96)
+            compose.waitForIdle()
+            compose.onNodeWithTag("commands").assertIsFocused()
+            val during = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+            org.junit.Assert.assertTrue("Held Up returns through intermediate positions", during > raised && during < initial - 1f)
+            instrumentation.sendKeySync(
+                android.view.KeyEvent(time, time + 100, android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_UP, 0),
+            )
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            compose.mainClock.advanceTimeBy(1200)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("app:Card1").assertIsFocused()
+        org.junit.Assert.assertTrue(
+            "Down cancels the return instead of leaving a late jump to the header position",
+            compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top < initial - 1f,
+        )
+    }
+
+    @Test
+    fun economyKeepsVerticalPageReturnAnimated() {
+        val catalog = (1..40).map { TvApp("Card$it", "fixture", "Card$it", 0) }
+        compose.setContent {
+            HazeTestTheme(LauncherPreferences(quality = fr.deuspheara.oree.core.model.QualityTier.ECONOMY)) {
+                HomeScreen(
+                    state = HomeUiState(catalog, false),
+                    resume = 0,
+                    reduceMotion = false,
+                    economy = true,
+                    systemReduceMotion = false,
+                    favorites = listOf("Card1"),
+                    onAction = {},
+                )
+            }
+        }
+        compose.waitForIdle()
+        val initial = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitForIdle()
+        val raised = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+        compose.onNodeWithTag("app:Card1").assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            compose.mainClock.advanceTimeBy(96)
+            compose.waitForIdle()
+            val during = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top
+            org.junit.Assert.assertTrue("Economy must not snap the page to the top", during > raised && during < initial - 1f)
+            compose.mainClock.advanceTimeBy(1000)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("commands").assertIsFocused()
+        assertEquals(initial, compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot.top, 1f)
+    }
+
+    @Test
     fun focusedCatalogCardsClearTheFloatingToolbarAfterScrolling() {
         val catalog = (1..40).map { TvApp("Card$it", "fixture", "Card$it", 0) }
         compose.setContent {
@@ -880,7 +969,6 @@ class HomeFocusTest {
                     resume = 0,
                     reduceMotion = false,
                     systemReduceMotion = false,
-                    retainDock = true,
                     sourceKey = "fixture",
                     onAction = { action ->
                         when (action) {
@@ -911,7 +999,7 @@ class HomeFocusTest {
     }
 
     @Test
-    fun retainedDockPreservesNativeFocusAndOriginalScrollReturn() {
+    fun liquidDockPreservesNativeFocusAndOriginalScrollReturn() {
         val catalog = (1..40).map { TvApp("Card$it", "fixture", "Card$it", 0) }
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
@@ -920,7 +1008,6 @@ class HomeFocusTest {
                     resume = 0,
                     reduceMotion = true,
                     favorites = listOf("Card1"),
-                    retainDock = true,
                     sourceKey = "fixture",
                     onAction = { action ->
                         when (action) {
@@ -931,7 +1018,7 @@ class HomeFocusTest {
             }
         }
         compose.waitUntil(10000) {
-            compose.onAllNodesWithTag("retained-menu-image").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag("liquid-dock-surface").fetchSemanticsNodes().isNotEmpty()
         }
         val before = compose.onNodeWithTag("favorites-dock").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("app:Card1").assertIsFocused().performKeyInput {
@@ -987,7 +1074,7 @@ class HomeFocusTest {
     }
 
     @Test
-    fun heldUpRepeatDoesNotSkipTheDockIntoHeader() {
+    fun heldUpRepeatContinuesFromDockToHeader() {
         compose.setContent {
             HazeTestTheme(LauncherPreferences()) {
                 HomeScreen(
@@ -1030,9 +1117,6 @@ class HomeFocusTest {
             ),
         )
         compose.waitForIdle()
-        compose.onNodeWithTag("app:Alpha").assertIsFocused().performKeyInput {
-            pressKey(Key.DirectionUp)
-        }
         compose.onNodeWithTag("commands").assertIsFocused()
     }
 }
