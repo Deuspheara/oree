@@ -1,10 +1,11 @@
-@file:OptIn(dev.chrisbanes.haze.ExperimentalHazeApi::class)
+@file:OptIn(dev.chrisbanes.haze.ExperimentalHazeApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 
 package fr.deuspheara.oree.core.designsystem.glass
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -67,6 +69,8 @@ fun WallpaperBackground(
         tween(if (reduced) 0 else 280),
         label = "wallpaper-depth",
     )
+    val wallpaper = updateTransition(image, label = "wallpaper")
+    SplitWallpaperGlassSources(wallpaper, frost, reduced, { diffusion }, sampleForGlass && liquidGlass && !reducedTransparency)
     Box(
         Modifier.fillMaxSize()
             .graphicsLayer {
@@ -82,7 +86,7 @@ fun WallpaperBackground(
                     ?.let { Modifier.hazeSource(it) } ?: Modifier,
             ),
     ) {
-        Crossfade(image, animationSpec = tween(if (reduced) 0 else 300), label = "wallpaper") { current ->
+        wallpaper.Crossfade(animationSpec = tween(if (reduced) 0 else 300)) { current ->
             if (current != null) {
                 Image(current, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
@@ -154,6 +158,9 @@ fun Modifier.glassSurface(
     performanceMode: HazePerformanceMode = HazePerformanceMode.Balanced,
 ): Modifier {
     val source = LocalGlassSource.current
+    val split = LocalSplitWallpaperGlass.current
+    val useSplit = split != null && split.original === source && split.available.value &&
+        treatment == GlassTreatment.CLEAR && progressive == null && performanceMode == HazePerformanceMode.Balanced
     val shape = RoundedCornerShape(radius)
     val surface = DesignTokens.surface
     val intensity =
@@ -161,7 +168,7 @@ fun Modifier.glassSurface(
     val fallback = usesOpaqueGlass(opaque)
     val lightMenu = DesignTokens.background.luminance() > .5f && role == GlassSurfaceRole.MENU
     val style =
-        remember(shape, intensity, treatment, lightMenu, progressive) {
+        remember(shape, intensity, treatment, lightMenu, progressive, useSplit) {
             GlassStyle.clear.then {
                 shape(shape)
                 backgroundColor(
@@ -177,7 +184,9 @@ fun Modifier.glassSurface(
                     blurRadius =
                         (
                             (
-                                if (treatment == GlassTreatment.CLEAR) {
+                                if (useSplit) {
+                                    0f
+                                } else if (treatment == GlassTreatment.CLEAR) {
                                     1.25f
                                 } else if (progressive != null) {
                                     16f
@@ -198,8 +207,22 @@ fun Modifier.glassSurface(
         this.clip(shape).background(surface)
     } else {
         this.clip(shape)
+            .then(
+                if (useSplit) {
+                    Modifier.drawWithContent {
+                        android.os.Trace.beginSection("Oree:split-glass-optics")
+                        try {
+                            drawContent()
+                        } finally {
+                            android.os.Trace.endSection()
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .hazeGlass(
-                input = HazeInput.Sources(source),
+                input = HazeInput.Sources(if (useSplit) split!!.filtered else source),
                 style = style,
                 performanceMode = performanceMode,
             )

@@ -550,6 +550,7 @@ fun LauncherRoot(
     ReportDrawnWhen { stored != null && organization != null && !state.loading }
     var catalogBackdrop by remember { mutableStateOf(false) }
     val glassSource = dev.chrisbanes.haze.rememberHazeState()
+    val splitGlass = remember(glassSource) { fr.deuspheara.oree.core.designsystem.glass.SplitWallpaperGlass(glassSource) }
     val materialPreferences = active
     LauncherTheme(materialPreferences) {
         CompositionLocalProvider(
@@ -557,6 +558,7 @@ fun LauncherRoot(
             LocalOpaquePanels provides settingsOpen,
             fr.deuspheara.oree.core.designsystem.glass.LocalSettingsPage provides settingsOpen,
             LocalGlassSource provides glassSource,
+            fr.deuspheara.oree.core.designsystem.glass.LocalSplitWallpaperGlass provides splitGlass,
             LocalLiquidGlass provides materialPreferences.liquidGlass,
             LocalGlassIntensity provides materialPreferences.glassIntensity,
             LocalReducedTransparency provides

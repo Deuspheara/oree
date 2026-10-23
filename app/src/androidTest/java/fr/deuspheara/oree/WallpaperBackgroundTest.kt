@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -23,6 +24,8 @@ import dev.chrisbanes.haze.rememberHazeState
 import fr.deuspheara.oree.core.designsystem.glass.GlassTreatment
 import fr.deuspheara.oree.core.designsystem.glass.LocalGlassSource
 import fr.deuspheara.oree.core.designsystem.glass.LocalLiquidGlass
+import fr.deuspheara.oree.core.designsystem.glass.LocalSplitWallpaperGlass
+import fr.deuspheara.oree.core.designsystem.glass.SplitWallpaperGlass
 import fr.deuspheara.oree.core.designsystem.glass.WallpaperBackground
 import fr.deuspheara.oree.core.designsystem.glass.glassSurface
 import fr.deuspheara.oree.core.designsystem.theme.LauncherTheme
@@ -113,6 +116,48 @@ class WallpaperBackgroundTest {
         } finally {
             compose.mainClock.autoAdvance = true
         }
+    }
+
+    @Test
+    fun preparedFrostIsDiscardedWithItsWallpaperAndReattachmentUsesFreshPixels() {
+        org.junit.Assume.assumeTrue(android.os.Build.VERSION.SDK_INT >= 33)
+        fun opaque(color: Color): ImageBitmap = ImageBitmap(80, 45, hasAlpha = false).also {
+            Canvas(it).drawRect(Rect(0f, 0f, 80f, 45f), Paint().apply { this.color = color })
+        }
+        val frame = opaque(Color.Red)
+        var frost by mutableStateOf(opaque(Color.Green))
+        var attached by mutableStateOf(true)
+        var inputs: SplitWallpaperGlass? = null
+        compose.setContent {
+            val source = rememberHazeState()
+            val prepared = remember(source) { SplitWallpaperGlass(source) }
+            inputs = prepared
+            LauncherTheme(LauncherPreferences()) {
+                CompositionLocalProvider(LocalGlassSource provides source, LocalSplitWallpaperGlass provides prepared) {
+                    Box(Modifier.size(240.dp, 135.dp)) {
+                        if (attached) WallpaperBackground(frame, true, frost, true)
+                        Box(
+                            Modifier.size(
+                                100.dp,
+                                80.dp,
+                            ).testTag("prepared-frost").glassSurface(radius = 0.dp, treatment = GlassTreatment.CLEAR),
+                        )
+                    }
+                }
+            }
+        }
+        val green = center("prepared-frost")
+        compose.runOnIdle { assertTrue("The opaque source prepares filtering", inputs?.available?.value == true) }
+        assertTrue("The prepared frost is visible", green.green > green.blue + .2f)
+        compose.runOnIdle { attached = false }
+        compose.runOnIdle { assertTrue("Disposal withdraws the prepared source", inputs?.available?.value == false) }
+        compose.runOnIdle {
+            frost = opaque(Color.Blue)
+            attached = true
+        }
+        val blue = center("prepared-frost")
+        compose.runOnIdle { assertTrue("Reattachment prepares the new source", inputs?.available?.value == true) }
+        assertTrue("Reattachment cannot reuse the old filtered frost", blue.blue > blue.green + .2f)
     }
 
     @Test

@@ -35,6 +35,8 @@ import fr.deuspheara.oree.core.designsystem.glass.GlassTreatment
 import fr.deuspheara.oree.core.designsystem.glass.LocalGlassIntensity
 import fr.deuspheara.oree.core.designsystem.glass.LocalGlassSource
 import fr.deuspheara.oree.core.designsystem.glass.LocalLiquidGlass
+import fr.deuspheara.oree.core.designsystem.glass.LocalSplitWallpaperGlass
+import fr.deuspheara.oree.core.designsystem.glass.SplitWallpaperGlass
 import fr.deuspheara.oree.core.designsystem.glass.WallpaperBackground
 import fr.deuspheara.oree.core.designsystem.glass.glassSurface
 import fr.deuspheara.oree.core.designsystem.theme.LauncherTheme
@@ -48,7 +50,9 @@ import org.junit.Test
 class GlassStageFidelityTest {
     @get:Rule val compose = createComposeRule()
 
-    private fun pattern(swap: Boolean): ImageBitmap = ImageBitmap(800, 450).also { image ->
+    private val opaqueFixture = InstrumentationRegistry.getArguments().getString("opaqueWallpaper") == "true"
+
+    private fun pattern(swap: Boolean): ImageBitmap = ImageBitmap(800, 450, hasAlpha = !opaqueFixture).also { image ->
         val canvas = Canvas(image)
         for (y in 0 until 30) {
             for (x in 0 until 40) {
@@ -58,7 +62,7 @@ class GlassStageFidelityTest {
                 canvas.drawRect(
                     Rect(x * 20f, y * 15f, (x + 1) * 20f, (y + 1) * 15f),
                     Paint().apply {
-                        val alpha = if ((x + y) % 4 == 0) .35f else 1f
+                        val alpha = if (!opaqueFixture && (x + y) % 4 == 0) .35f else 1f
                         color = if (swap) Color(blue, green, red, alpha) else Color(red, green, blue, alpha)
                     },
                 )
@@ -77,8 +81,12 @@ class GlassStageFidelityTest {
         var tilted by mutableStateOf(false)
         var clearBounds = Rect.Zero
         val composited = InstrumentationRegistry.getArguments().getString("glassNativeLayer") == "true"
+        var prepared: SplitWallpaperGlass? = null
         compose.setContent {
             val source = rememberHazeState()
+            val split = remember(source) { SplitWallpaperGlass(source) }
+            prepared = split
+            val prefiltered = InstrumentationRegistry.getArguments().getString("splitWallpaper") == "true"
             val progressive = remember {
                 HazeProgressive.Brush(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
             }
@@ -86,6 +94,7 @@ class GlassStageFidelityTest {
             LauncherTheme(LauncherPreferences()) {
                 CompositionLocalProvider(
                     LocalGlassSource provides source,
+                    LocalSplitWallpaperGlass provides if (prefiltered) split else null,
                     LocalLiquidGlass provides true,
                     LocalGlassIntensity provides 1f,
                 ) {
@@ -147,6 +156,12 @@ class GlassStageFidelityTest {
             }
         }
         compose.waitForIdle()
+        if (InstrumentationRegistry.getArguments().getString("splitWallpaper") == "true") {
+            assertTrue(
+                "Opaque fixture must exercise the prepared input; alpha sources must fall back",
+                prepared?.available?.value == opaqueFixture,
+            )
+        }
         compose.mainClock.autoAdvance = false
         try {
             capture("00-initial")
@@ -177,6 +192,11 @@ class GlassStageFidelityTest {
                 tilted = false
             }
             compose.mainClock.advanceTimeBy(144)
+            if (InstrumentationRegistry.getArguments().getString("splitWallpaper") == "true" && opaqueFixture) {
+                compose.runOnIdle {
+                    assertTrue("Changing wallpaper keeps live glass until its crossfade settles", prepared?.available?.value == false)
+                }
+            }
             capture("05-source-midpoint")
             compose.mainClock.advanceTimeBy(500)
             capture("06-source-settled")

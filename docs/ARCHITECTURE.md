@@ -114,3 +114,10 @@ fields preserve schema/version compatibility: absent legacy fields decode to com
 and full motion. Imported values receive the same strict type/range validation as other
 appearance fields. Settings category focus/viewport survive one-column navigation in the
 existing saveable scopes; requester registration remains bounded and cancellable.
+
+The app composition owns `SplitWallpaperGlass` beside its original Haze source. For bounded
+opaque wallpapers, separate stationary sharp/frost filters feed a blended source for clear
+controls; their refraction and lighting retain the current control geometry. Source identity,
+opacity, sampling policy and the wallpaper transition govern eligibility. The original input
+remains selected during wallpaper crossfades and for other materials. Haze/Compose own the
+graphics layers and their disposal; no pixels enter ViewModels, saved state or a disk cache.

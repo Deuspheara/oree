@@ -247,3 +247,20 @@ optimized rapid-vertical comparison, check `TVL:pageReturnHandoff` before attrib
 to the new branch; match actual keys/focus destinations and scenes, and report changes to the
 intended intermediate trajectory separately from rendering cost. Inspect the physical remote
 result without a recorder or benchmark active.
+
+## Separate wallpaper filtering
+
+Run `GlassStageFidelityTest` with `-e splitWallpaper true -e opaqueWallpaper true` to exercise
+prepared sharp/frost inputs, and with `-e splitWallpaper false -e opaqueWallpaper true` for
+the original renderer. The controlled-clock fixture asserts fallback while the wallpaper
+crossfade runs. Compare its 21 native-window frames through scroll-like movement, reversal,
+press/tilt, wallpaper replacement, resize and reattachment. `-e opaqueWallpaper false` with
+prepared inputs enabled verifies the translucent-source fallback. These synthetic captures
+establish sampled appearance and freshness, not input latency or frame pacing.
+
+`WallpaperBackgroundTest.preparedFrostIsDiscardedWithItsWallpaperAndReattachmentUsesFreshPixels`
+checks source withdrawal on disposal and fresh filtered pixels after reattachment. Keep the
+existing reduced-motion, navigation/reversal, Settings-return and lifecycle cases alongside it.
+Compare the exact final optimized APK on the physical TV for first-entry and rapid vertical
+scrolling, validate actual events/focus/scenes and trace quality, and keep resource queries
+outside timed bursts. See PERFORMANCE.md for the tested source, measured scope and limits.

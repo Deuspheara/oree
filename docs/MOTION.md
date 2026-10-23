@@ -131,3 +131,9 @@ routes and visual quality are unchanged. An earlier, faster handoff felt better 
 The gentler cap passes its first matched current-quality regression screen; physical
 acceptance and independent confirmation are pending. Mathematical bounds and functional passes
 alone do not prove smoothness.
+
+Clear glass can reuse separately filtered sharp and frosted wallpaper inputs. The visible
+wallpaper, 280 ms depth/veil transition and live optical motion retain their existing behavior.
+The filtered inputs share the visible wallpaper's transition, and clear controls use the
+original source until that transition settles. Opaque-source and size guards preserve the
+original rendering path for translucent images and roots above 2,097,152 pixels.

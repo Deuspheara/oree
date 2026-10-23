@@ -68,12 +68,12 @@ internal fun HomeContinuationRow(
                         Modifier.fillMaxWidth()
                     }
                     ).focusProperties {
-                        onEnter = {
-                            if (requestedFocusDirection == FocusDirection.Up && onEnterFromBelow?.invoke() == false) {
-                                cancelFocusChange()
-                            }
+                    onEnter = {
+                        if (requestedFocusDirection == FocusDirection.Up && onEnterFromBelow?.invoke() == false) {
+                            cancelFocusChange()
                         }
-                    }.testTag("watch-next-row"),
+                    }
+                }.testTag("watch-next-row"),
             ) {
                 itemsIndexed(entries, key = { _, entry -> entry.id }, contentType = { _, _ -> "content" }) { index, entry ->
                     val requester = remember(entry.id) { FocusRequester() }

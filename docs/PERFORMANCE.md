@@ -1448,3 +1448,92 @@ explicitly opened, and the original Git index/default HOME are preserved. Endpoi
 for the supported retention build show unchanged artwork, panel geometry and header restoration;
 current gentler-motion remote feedback and independent timing confirmation remain pending.
 No device work continues during that remote check.
+
+
+## Separate sharp/frost filtering — 23 October 2026
+
+The retained implementation prepares separate stationary sharp and frosted wallpaper filters
+for clear glass, blends their outputs with the existing depth/veil alpha, and leaves refraction,
+lighting and material coordinates live. The public Haze 2.0.1 APIs, authored kernel and Balanced
+sampling are unchanged. No dependency patch or disk bitmap cache is introduced; shared image-cache and decode limits
+are unchanged. The original source remains selected during wallpaper replacement, for alpha
+images, roots above 2,097,152 pixels, other sampling modes and non-clear/progressive materials.
+The prepared inputs share the visible wallpaper transition and withdraw on source disposal.
+
+### Physical comparison and identity
+
+Physical Smart TV Pro, API 34, 1920×1080 app rendering at the existing approximately 60 Hz
+cadence; no system display/power/HOME/accessibility setting changed. The same personal
+wallpaper, Balanced profile, full motion and glass intensity 1 are retained. The saved blur
+value was initially 0: that diagnostic and an aborted settings preflight are excluded from
+inference. Enabled comparisons use blur 1, selected through the app slider. Raw APKs, source
+patches, configuration backup, failed/excluded runs, captures and traces remain private.
+
+| Identity | SHA256 / revision |
+| --- | --- |
+| Baseline checkout | `d07dc0cc927e2b3686d254677633ebc12ae41c4a` |
+| Baseline optimized APK | `5e2dd9b8f6a50d49bf8233851ddab49a6d2a3a9e67667d1c30c901f792e3191c` |
+| Final production-source fingerprint | `c5b84da927ec1b5b329b165d32bd367dc876b219ebf0a8e97181b1aab235ff6c` |
+| Final optimized APK | `30c79a19eea64314ea9dadb5d5feaa7d826bfe18396212e304f493b79e13d033` |
+
+All timing uses optimized R8/resource-shrunk APKs, cached/offline dependencies, JDK 21 and
+Partial/Require with three compilation warmups and three measured iterations per method.
+Rapid warm navigation primes a tour, then measures three six-Down/six-Up tours at the existing
+180 ms device cadence. First traversal restarts the process and measures one tour at 500 ms;
+OS/file/image/driver caches remain, so this is not first-install or cold-cache evidence.
+There are no memory queries, hierarchy dumps or recordings inside timed bursts.
+
+The initial prototype reproduces its rapid p95 gain in A1/B1/B2/A2 order: baseline 85.54/88.47 ms,
+prototype 69.76/71.37 ms; prototype p99 107.41/107.99 ms versus baseline 124.41/127.94 ms.
+The final source adds shared-transition gating and existing intensity normalization. Its own
+fresh block follows the return baseline A2; do not pool prototype iterations as final-source
+measurements. Every accepted iteration matches delivered events, logical focus destinations,
+visible text/bounds and trace-quality prerequisites. The prepared-input marker is present in
+all final iterations. Source/installed APK hashes are checked after replacement installs.
+
+| Final comparison, three iterations each | CPU-frame p50 / p95 / p99 (ms) | App deadline misses |
+| --- | --- | --- |
+| Baseline A2, rapid warm | 33.07 / 88.47 / 127.94 | 306/770 (39.74%) |
+| Final C, rapid warm | 33.39 / 69.63 / 106.97 | 315/879 (35.84%) |
+| Baseline A2, first traversal | 11.34 / 80.78 / 121.36 | 208/746 (27.88%) |
+| Final C, first traversal | 13.08 / 67.97 / 102.51 | 198/805 (24.60%) |
+
+Final rapid p95 falls 21.3% and first-traversal p95 15.9%; tails improve as well. Medians do not
+improve, and rapid absolute misses are not lower: more app frames are produced. CPU-frame
+intervals include pipeline blocking and are neither pure CPU/GPU execution nor input latency.
+The <1% deadline target remains unmet and event-to-first-changed-presented-pixel p95 <50 ms
+remains unverified. This is a partial physical-TV improvement, not smoothness certification,
+independent final-source ABBA replication, hardware-wide compatibility or release acceptance.
+
+### Sampled appearance and resources
+
+The exact final debug/test APKs pass five native rendering cases in both control and prepared
+modes. The 21 controlled-clock frame pairs cover movement, reversal, tilt, wallpaper replacement,
+resizing, stationary frost and reattachment. Maximum whole-frame mean RGB difference is
+0.108 levels/255, maximum channel difference 9, and at most 0.213% of pixels differ by more than
+3 levels. The wallpaper-replacement midpoint is pixel-identical because it uses the original
+source until its shared transition settles. Other sampled frames are very close, not identical.
+Both synthetic frames and actual optimized Home were visually inspected. An empty dock-material
+region over the same wallpaper differs by at most 2 channel levels (mean 0.226/255); this excludes
+dynamic cards and the clock. These inspections do not establish all-scene fidelity or latency.
+
+Resource work is separate: one priming tour and five repeated vertical tours per APK, identical
+packaged speed-profile compilation, host-driven 500 ms pauses plus ADB/query overhead, followed
+by settle, background and resume. Sampled maximum PSS is 69,834/68,961 KiB (baseline/final),
+settled PSS 66,705/63,595 KiB. Do not attribute this small PSS difference to the cache. Settled HWUI
+GPU cache increases from 71.81 to 85.54 MiB, about 13.74 MiB, and stays bounded across the sampled
+cycles; background values fall to 5.13/2.16 MiB. Resumed final rendering was inspected. PSS and
+HWUI cache are separate accounting, not total driver memory or unsampled peaks. This short
+screen does not replace 10/30-minute memory, idle CPU, startup or Home-usable acceptance.
+Existing performance budgets, shared 12 MiB Coil cache and decode limits remain unchanged.
+
+Required formatting, architecture, module tests, Debug lint, Debug/optimized APK compilation,
+instrumentation/benchmark compilation and avatar validation pass. Spotless also corrected
+existing indentation in HomeContinuationRow; that file's diff is formatting only.
+
+Nine additional native vertical-navigation, Settings-return, lifecycle and artwork cases pass,
+and the alpha-source fixture passes with prepared filtering enabled but ineligible. Configured
+DataStore and wallpaper bytes match the task-start archive after restoring the app blur slider
+to its original 0. The exact tested optimized APK is replacement-installed, pulled back and
+hash-verified, then explicitly started. Default HOME is unchanged. No public push or release
+was performed. Raw preservation and deployment evidence remains outside tracked source.
