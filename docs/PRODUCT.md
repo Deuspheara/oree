@@ -1,35 +1,26 @@
-# Product
+# Product scope
 
-Oree is a local Android TV / Google TV HOME application for everyday remote use. Priorities are reliable navigation and return, responsiveness, visual consistency and optional integrations. It is an ordinary application, not a ROM, streaming service or privileged launcher replacement.
+Oree is a local Android TV / Google TV launcher for everyday remote use. Priorities are reliable navigation, clear focus and an appearance the user can adjust to their TV.
 
-## Current scope
+## Included
 
-- Discover and launch installed TV apps; organize favorites and folders with stable identities.
-- Jump between Home sections through Overview; explicitly Peek into a folder to launch a member without opening full management.
-- Search local apps, folders, settings actions, enabled public content and accessible photo names.
-- Store local profiles with independent appearance, organization and wallpaper settings.
-- Offer settings, command controls, optional local photos, ambient display and an Android screensaver.
-- Export/import validated configuration through local documents, with review and one-step undo.
+- Installed-app browsing, favorites, folders, reorder, Overview and folder Peek.
+- Local search for apps, folders, settings actions, enabled public content and accessible photo names.
+- Local profiles with independent layouts, appearances and wallpapers.
+- Six previewable [visual experience levels](PERFORMANCE.md), from Simple to Live Liquid Glass.
+- Settings, command controls, optional local photos, manual ambient display and an Android screensaver.
+- Reviewed configuration export/import, atomic restore and one-step undo. Backups reference images rather than including them.
 
-The app works without accounts or media permissions. Enabled public content sources may fetch HTTPS artwork; core launcher functions remain offline. Sparse catalogs stay sparse; content must come from authentic enabled sources. Profiles affect launcher configuration, not accounts or playback inside streaming applications. Backups exclude image binaries; missing image references fall back to built-in scenery.
+New profiles start with a welcome screen. Keeping the current appearance or choosing Finish/Apply is explicit; browsing the slider does not save. Existing profiles retain their stored appearance. Settings shows one level at a time, and Back restores the previous logical focus and viewport.
+
+## Optional content and privacy
+
+Core app launching works offline without accounts or media permissions. Optional Android TV providers supply available Continue Watching and preview entries; enabled content can download public HTTPS artwork. Empty catalogs remain empty. Missing images use local fallbacks.
+
+There are no ads, telemetry or mandatory accounts. Profiles configure Oree; they do not change accounts or playback in streaming apps. Android and external apps own playback, DRM, permissions, system keys and screensaver scheduling.
 
 ## Boundaries
 
-No ads, telemetry, required backend, root, overlay, accessibility service or privileged HOME behavior. Android owns playback, DRM, external apps, permissions and system keys. Do not imply a universal streaming catalog, global playback history or system parental control.
+Oree is an ordinary app, not a ROM or privileged launcher replacement. Do not add root, overlays, accessibility services or privileged HOME behavior. It is not a universal streaming catalog, global playback history or system parental control.
 
-Features and UI are still evolving. Public release requires device/accessibility coverage, measured performance, dependency/asset review and explicit maintainer approval.
-
-## Visual setup and direct Settings navigation
-
-New local profiles begin with a welcome screen. Users can keep the current appearance or
-preview six relative visual workloads, from Simple to Live Liquid Glass, using a stepped remote slider.
-Only Finish saves the draft; setup remains visible while that profile's accepted write is
-pending or failed. Existing stored profiles skip welcome and retain their appearance.
-Appearance → Visual experience reopens the preview later.
-
-Settings shows one column at a time. Select opens a category or choice; Back returns one
-level and restores the previous logical focus and viewport. Folder hover keeps its icon
-preview without an instructional sentence. Continue Watching uses the screen-wide viewport,
-with its initial card aligned to the heading's inset.
-
-The visual experience rail also offers a sixth, final **Live Liquid Glass** step. It is an explicit opt-in to live Haze optics and uninterrupted focus effects during rapid navigation, with higher GPU cost. Existing profiles retain their previous renderer until selected.
+The app is a development preview. Public releases require explicit maintainer authorization, measured performance, device/accessibility coverage and dependency/asset review. [Builds and targeted tests](TEST_PLAN.md) do not establish release readiness.

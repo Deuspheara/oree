@@ -1,40 +1,29 @@
-# Content capabilities
+# Continue Watching, content and photos
 
-App-only Home works without provider or photo permissions. Content integrations are optional and use public Android APIs; they do not expose a universal catalog or global viewing history.
+Oree works as an app launcher without optional content or photo access.
 
-## Sources
+## Continue Watching and app previews
 
-Watch Next and Preview Programs have independent enablement and source-specific loading, empty, denied, unsupported and error states. Watch Next wallpaper and feed share the same bounded source snapshot. Preview-only mode must not query Watch Next. Filter by the selected package before wallpaper/presentation limits; changing focus does not start another source query.
+Enable the sources you want in Home settings. Watch Next and app previews are separate choices. Oree displays what installed apps share through Android TV's public providers; some apps or TVs may supply no entries.
 
-Only foreground subscriptions register observers. Invalidation bursts conflate, obsolete reads cancel through CancellationSignal, and failed refreshes retain cached entries with explicit source status. Returning to foreground refreshes missed changes. Do not add polling or keepalive work.
+Home shows one continuation per publisher. Available unfinished/Continue entries take priority. Progress bars and episode details appear only when a provider supplies valid information. Selecting an entry opens its external app; that app controls playback, account access and resume behavior.
 
-## Photos and external destinations
+Artwork may download over HTTPS when content sources are enabled. If loading fails, Oree uses available app artwork or a static fallback. Turning content off stops content-artwork requests.
 
-Local search can use already accessible photo names without requesting access. The gallery requests image access only when opened, with the system photo picker as an alternative. Import validates/bounds image decoding; unavailable images fall back locally. A rejected permission must not block the launcher.
+## Local photos and wallpapers
 
-Public content destinations, system search and input viewers remain external Android launches. Validate URI schemes and component resolution, catch missing/security failures and retain the launcher return target. Provider discovery is separate from actual playback/viewer success on a firmware.
+Opening the gallery can request image access. The system photo picker is an alternative. Denying access leaves other launcher features available.
 
-Diagnostics report observed availability. They must not imply access to another app's private database, account, playback progress or active audio route. See [Android compatibility](ANDROID_COMPATIBILITY.md) and [Testing](TEST_PLAN.md).
+Search can use photo names that are already accessible. In Photo Viewer, Left/Right browses photos, Select opens controls and Back returns. It does not automatically advance photos.
 
-## Optional continuation metadata
+Selecting an image in the wallpaper gallery applies it as a wallpaper. Missing or unavailable images fall back to built-in scenery. Configuration backups store image references, not the images themselves.
 
-Watch Next may supply episode title/display numbers, duration and last playback position.
-These remain nullable. Show progress only for positive duration and a position within it;
-never infer progress from engagement timestamps. Optional text is bounded/filtered. Vendors
-rejecting optional columns get one fallback to the previous base projection, preserving the
-bounded scan and CancellationSignal. Metadata does not establish playback entitlement,
-exact seek/resume behavior or access to every publisher.
+## Missing content
 
-## Per-app continuation and artwork
+An empty row can mean the source is disabled, denied, unsupported, unavailable or simply has nothing to share. It is not proof that an external app has no viewing history. Oree does not read private streaming-app databases or provide a universal catalog.
 
-Home shows one continuation per publisher. Genuine unfinished progress and Continue entries
-precede upcoming entries, using provider engagement timestamps to break ties. Preview weight
-order remains provider-owned; focused-app previews fill only publishers without Watch Next.
-Search keeps the full source catalog. Provider poster artwork falls back to thumbnail artwork.
+## Contributor notes
 
-Enabled content sources can now fetch public HTTPS artwork, explicitly authorized for this
-follow-up. HTTP and embedded credentials are rejected. Coil uses the existing 12 MiB shared
-memory cache, bounded decode requests, no disk cache/cookies, short timeouts and cancellation.
-A failed Home image falls back to app artwork. Content disabled means no content image requests.
-No notification listener or private app data access is added. Network artwork is not imported
-as a wallpaper; local wallpaper decoding retains its original contract.
+Keep source-specific loading/error states and cached data on refresh failure. Watch Next wallpaper/feed share a bounded snapshot; preview-only mode must not query Watch Next. Filter by selected package before presentation limits. Conflate invalidations, cancel obsolete reads and stop observers with the last foreground subscriber. Do not add polling.
+
+Validate external destinations and optional provider columns, with fallback for unsupported projections. Artwork keeps bounded requests, the shared 12 MiB memory cache, no disk cache/cookies and cancellation. Reject HTTP and embedded credentials. Photo permission/URI validation and decode bounds remain required. See [Testing](TEST_PLAN.md) and [Compatibility](ANDROID_COMPATIBILITY.md).

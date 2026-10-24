@@ -9,7 +9,7 @@
 | Required device feature | Android TV / Leanback |
 | Touchscreen | Optional |
 
-Configured SDK levels do not establish a complete device/firmware support matrix. Validate native focus, system IME, permissions, provider availability, external launches, screensaver behavior and rendering on each intended device class, including modest 32-bit hardware. Keep emulator and physical evidence separate.
+The current glass effect requires Android 13 / API 33 or later; earlier supported Android versions use solid surfaces. Configured SDK levels do not establish a complete device/firmware support matrix. Validate native focus, system IME, permissions, provider availability, external launches, screensaver behavior and rendering on each intended device class, including modest 32-bit hardware. Keep emulator and physical evidence separate.
 
 ## Optional platform access
 

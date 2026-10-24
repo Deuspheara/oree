@@ -18,7 +18,7 @@ Repository contracts belong to `core:domain`; persistence, serialization and mig
 python3 scripts/export-avatars.py --check
 ```
 
-Keep formatting-only changes separate from behavioral changes. Add meaningful unit tests for business/concurrency changes and native D-pad/lifecycle tests for interaction changes. See [Testing](docs/TEST_PLAN.md). Report failures and limitations alongside passing checks. Performance claims need matched optimized measurements under [the performance protocol](docs/PERFORMANCE.md).
+Keep formatting-only changes separate from behavioral changes. Add meaningful unit tests for business/concurrency changes and native D-pad/lifecycle tests for interaction changes. See [Testing](docs/TEST_PLAN.md). Report failures and limitations alongside passing checks. Performance claims need matched optimized measurements under [the performance protocol](docs/development/PERFORMANCE.md).
 
 Keep captures, APKs, traces, local configuration and signing keys out of commits. Test this package explicitly without changing another launcher or system settings. Follow [Recovery](docs/RECOVERY.md) on configured TVs.
 

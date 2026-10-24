@@ -1,76 +1,46 @@
 # Oree
 
-A local, remote-first Android TV and Google TV launcher, built with Kotlin and Compose for TV.
+A launcher for Android TV and Google TV. Browse your apps, keep favorites in a dock, and organize the rest into folders—all with your remote.
 
-![Oree Home with sample apps](docs/screenshots/home.png)
+![Oree Home](docs/screenshots/home.png)
 
-Browse apps, organize favorites and folders, and switch between local profiles. Oree combines a glass dock, animated focus, local search, wallpapers and controls designed for a D-pad. English and French are included.
+Oree includes local profiles, search, wallpapers and English/French menus. Optional features add Continue Watching, local photos, a screensaver and settings backup. Your streaming apps still handle playback and their own accounts.
 
-- **Your layout:** favorites, folders, app organization and independent profile appearances.
-- **Your visual workload:** six previewable steps, from static Simple to Live Liquid Glass. The final step uses live Haze refraction and retains full focus animation during rapid navigation; it costs more GPU time. Reduced motion and contrast preferences take precedence. Open **Settings → Appearance → Visual experience**.
-- **Local by default:** no Internet permission, ads, telemetry or required account. Optional Android TV content providers supply their own available content; streaming apps own playback and their accounts.
-- **Optional extras:** accessible local photos, ambient display, an Android screensaver and validated configuration export/import with undo. Image files are referenced rather than embedded in backups.
+**Development preview:** there is no downloadable release yet. To try it, follow the [build and install guide](docs/GETTING_STARTED.md). Keep your current launcher installed.
 
-This is an early development project with no published release. Minimum API support is a build target; physical device coverage and performance acceptance remain limited. See [compatibility](docs/ANDROID_COMPATIBILITY.md) and [performance](docs/PERFORMANCE.md).
+## Choose your look
 
-| Profiles | Visual experience |
+Open **Settings → Appearance → Visual experience**. Use Left/Right to preview a level, then choose Apply. The choice is saved for the current profile.
+
+| Level | What you get | Expected graphics workload |
+| --- | --- | --- |
+| 1. Simple | Solid surfaces, static focus, no glass or background blur | Lowest |
+| 2. Light | Gentle animations, solid surfaces | Low |
+| 3. Balanced | Softer animations, light glass and background blur | Moderate |
+| 4. Rich | Full card motion and stronger glass | High |
+| 5. Full effect | Strongest glass and blur, with prepared effects reused where possible | Higher |
+| 6. Live Liquid Glass | Highest-quality live glass; full card animation even while holding an arrow key | Highest |
+
+Try **Balanced** first. Move left if scrolling feels choppy; move right if you prefer richer effects. These are relative workload descriptions, not measured FPS ratings. See the [visual quality guide](docs/PERFORMANCE.md) for the differences and accessibility options.
+
+| Floating profiles | Visual experience |
 | --- | --- |
-| ![Profile switcher](docs/screenshots/profiles.png) | ![Live Liquid Glass option](docs/screenshots/live-glass.png) |
+| ![Profile switcher](docs/screenshots/profiles.png) | ![Visual experience slider](docs/screenshots/live-glass.png) |
 
-These are physical-TV captures of the actual UI with in-memory sample data and project-owned artwork, rather than a personal catalog. See [capture details](docs/screenshots/README.md).
+[About these sample screenshots](docs/screenshots/README.md).
 
-## Build
+## Privacy and everyday use
 
-Use JDK 21 and Android SDK 37. Configure `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
+No required account, ads or telemetry. Core app launching works offline. Optional content artwork can download over HTTPS when content sources are enabled. Continue Watching depends on what installed apps share with Android TV; some apps may supply nothing.
 
-```sh
-sdkmanager "platforms;android-37" "build-tools;36.0.0"
-./gradlew :app:assembleDebug
-```
+Profiles keep separate launcher layouts and appearances. They do not switch accounts inside streaming apps. Backups save settings and image references; they do not include the image files themselves.
 
-The Gradle wrapper and dependency catalog pin the toolchain. Minimum Android API is 26; target API is 36. APKs are written under `app/build/outputs/apk/`.
+## Learn more
 
-## Run
+- [Build and install](docs/GETTING_STARTED.md)
+- [Visual quality and performance](docs/PERFORMANCE.md)
+- [Folders](docs/FOLDER_MANAGEMENT.md), [content and photos](docs/CONTENT_CAPABILITIES.md), [compatibility](docs/ANDROID_COMPATIBILITY.md)
+- [All documentation](docs/README.md)
+- [Contributing](CONTRIBUTING.md) and [public source preparation](docs/PUBLICATION.md)
 
-Install and explicitly start the application without changing the current default launcher:
-
-```sh
-adb -s "$TV_DEVICE" install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s "$TV_DEVICE" shell am start -n fr.deuspheara.oree/.MainActivity
-```
-
-Keep another launcher installed and read [Recovery](docs/RECOVERY.md) before device testing. The application ID is `fr.deuspheara.oree`. Profiles and settings belong to this app's private sandbox; configuration exports can be reviewed and imported locally. Backup files reference wallpaper images rather than embedding them.
-
-## Project layout
-
-| Directory | Purpose |
-|---|---|
-| `app/` | Android entry points, dependency assembly and navigation |
-| `core/` | Models, domain contracts, persistence, Android adapters and design system |
-| `feature/` | Home, settings, profiles and search presentation |
-| `benchmark/` | Optimized benchmarks and baseline-profile journeys |
-| `build-logic/` | Shared Gradle conventions |
-| `assets/` | Original avatar masters and export metadata |
-| `scripts/` | Asset, profiling and dependency-inventory tools |
-| `docs/` | Current product and engineering contracts |
-
-See [Architecture](docs/ARCHITECTURE.md) for module boundaries and [Contributing](CONTRIBUTING.md) for development rules.
-
-## Verify
-
-```sh
-./gradlew spotlessCheck verifyArchitecture test lintDebug \
-  :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleBenchmarkRelease
-./gradlew :app:assembleDebugAndroidTest :benchmark:assembleNonMinifiedRelease
-python3 scripts/export-avatars.py --check
-```
-
-Formatting uses Spotless/ktlint. Android Lint and module-boundary checks are mandatory. Device tests, accessibility checks and physical performance measurements are separate requirements; build success does not establish release readiness. See [Testing](docs/TEST_PLAN.md) and [Performance](docs/PERFORMANCE.md).
-
-## Public source preparation
-
-See [publication notes](docs/PUBLICATION.md) for reviewing Git history, keeping local evidence private, and preparing a source archive.
-
-## License
-
-Original project work is licensed under [Apache-2.0](LICENSE). Dependency and asset notices are listed in [THIRD_PARTY.md](THIRD_PARTY.md). There is no published release yet.
+Original work is licensed under [Apache-2.0](LICENSE). See [third-party notices](THIRD_PARTY.md).

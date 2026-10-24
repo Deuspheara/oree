@@ -4,7 +4,7 @@ Oree is a development project with no supported production release or completed 
 
 ## Current boundaries
 
-- The app has no Internet permission, telemetry, remote backend or silent updater.
+- Core app launching works offline. Optional content artwork can use HTTPS; the app declares Internet permission. There is no telemetry, required backend or silent updater.
 - The HOME activity is exported for Android launcher integration. Incoming extras are not a command interface.
 - The screensaver service is exported behind Android's `BIND_DREAM_SERVICE` permission.
 - Local photo access and public TV-listing access are optional. Denial must preserve app-only operation.

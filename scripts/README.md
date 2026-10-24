@@ -8,7 +8,7 @@ Run tools from the repository root unless their help says otherwise. Python tool
 
 ## Benchmarks and traces
 
-`benchmark/` contains shared startup, catalog, favorites and secondary-screen journeys, profile comparison and full-compilation diagnostics. Use optimized non-debuggable APKs; see [Performance](../docs/PERFORMANCE.md) and [Testing](../docs/TEST_PLAN.md).
+`benchmark/` contains shared startup, catalog, favorites and secondary-screen journeys, profile comparison and full-compilation diagnostics. Use optimized non-debuggable APKs; see [Performance measurement](../docs/development/PERFORMANCE.md) and [Testing](../docs/TEST_PLAN.md).
 
 - `measure-tv.py`: explicit-package process-cold/legacy 60-key/idle diagnostics. Requires `TV_DEVICE`, ADB and an installed optimized target; `--label` keeps runs distinct. Its host-driven tour is not the reference warm protocol.
 - `capture-tv-trace.py`, `trace-config.pbtxt`, `analyze-trace.sql`: source-scoped legacy Perfetto diagnostic and analysis. Pass `--trace-processor` pointing to an existing local processor binary. The collector archives advertised data sources and the exact configuration, then fails if trace-quality prerequisites are absent. It does not measure input cadence/destinations or input-to-presentation latency.
