@@ -539,6 +539,24 @@ fun LauncherRoot(
         }
     }
     LaunchedEffect(commands) { if (!commands) commandBackdrop = null }
+    var profileBackdrop by remember { mutableStateOf<WallpaperFrame?>(null) }
+    val sampleProfileScene = android.os.Build.VERSION.SDK_INT >= 33 && active.liquidGlass && !active.reduceTransparency &&
+        !active.highContrast && active.quality != QualityTier.ECONOMY && !settingsOpen
+    LaunchedEffect(profilesOpen, profile?.id, sampleProfileScene, lifecycle) {
+        profileBackdrop = null
+        if (profilesOpen && sampleProfileScene) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                try {
+                    // PixelCopy reads the Activity window, excluding the separate profile Dialog.
+                    profileBackdrop = activity?.let { captureMenuBackdrop(it) }
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    profileBackdrop = null
+                }
+            }
+        }
+    }
+
     fun openContent(entry: ContentEntry) {
         scope.launch {
             val request = resolveContent(context, entry.intentUri, entry.source)
@@ -1691,7 +1709,8 @@ fun LauncherRoot(
                             profilesOpen = false
                             restoreEpoch++
                         },
-                        sourceKey = frame,
+                        sourceKey = profileBackdrop ?: frame,
+                        backdrop = remember(profileBackdrop) { profileBackdrop?.image?.asImageBitmap() },
                     )
                 }
                 if (photoGalleryOpen && profile != null) {

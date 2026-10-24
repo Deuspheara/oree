@@ -3,6 +3,7 @@ package fr.deuspheara.oree.feature.profiles.presentation.route
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.deuspheara.oree.core.model.ProfileSnapshot
 import fr.deuspheara.oree.feature.profiles.presentation.screen.ProfilePanel
@@ -19,6 +20,7 @@ fun ProfilesRoute(
     onCompleted: () -> Unit,
     onClose: () -> Unit,
     sourceKey: Any? = null,
+    backdrop: ImageBitmap? = null,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.status) {
@@ -39,5 +41,6 @@ fun ProfilesRoute(
             onClose()
         },
         sourceKey = sourceKey,
+        backdrop = backdrop,
     )
 }

@@ -1,6 +1,7 @@
 package fr.deuspheara.oree.feature.profiles.presentation.screen
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -40,18 +41,22 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -73,6 +78,8 @@ import androidx.compose.ui.zIndex
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import fr.deuspheara.oree.core.designsystem.R
 import fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork
 import fr.deuspheara.oree.core.designsystem.avatar.ProfileAvatar
@@ -81,7 +88,11 @@ import fr.deuspheara.oree.core.designsystem.component.panelMotion
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
 import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.designsystem.glass.GlassSurfaceRole
+import fr.deuspheara.oree.core.designsystem.glass.GlassTreatment
+import fr.deuspheara.oree.core.designsystem.glass.LocalGlassSource
+import fr.deuspheara.oree.core.designsystem.glass.LocalLiquidGlass
 import fr.deuspheara.oree.core.designsystem.glass.LocalOpaquePanels
+import fr.deuspheara.oree.core.designsystem.glass.LocalReducedTransparency
 import fr.deuspheara.oree.core.designsystem.glass.RetainedMenuSurface
 import fr.deuspheara.oree.core.designsystem.glass.glassControlForeground
 import fr.deuspheara.oree.core.designsystem.glass.glassSurface
@@ -104,6 +115,7 @@ fun ProfilePanel(
     onDelete: (String) -> Unit,
     onClose: () -> Unit,
     sourceKey: Any? = null,
+    backdrop: ImageBitmap? = null,
 ) {
     val addLabel = stringResource(R.string.add_profile)
     val editLabel = stringResource(R.string.edit_profile)
@@ -125,7 +137,13 @@ fun ProfilePanel(
             }
         }
     }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides keepVisible) {
+    val sceneSource = rememberHazeState()
+    val sampleScene = backdrop != null && !opaque && LocalLiquidGlass.current &&
+        !LocalReducedTransparency.current && !LocalOpaquePanels.current
+    CompositionLocalProvider(
+        LocalBringIntoViewSpec provides keepVisible,
+        LocalGlassSource provides if (sampleScene) sceneSource else LocalGlassSource.current,
+    ) {
         GlassDialog(
             onDismissRequest = {
                 if (!saving) {
@@ -138,6 +156,7 @@ fun ProfilePanel(
                 }
             },
         ) {
+            if (sampleScene) ProfileSceneSource(backdrop!!, sceneSource)
             Box(
                 Modifier.fillMaxSize()
                     .onPreviewKeyEvent { event ->
@@ -173,14 +192,16 @@ fun ProfilePanel(
                         .panelMotion(motion, reduced, 32f)
                         .testTag("profile-panel"),
                 ) {
-                    CompositionLocalProvider(
-                        LocalOpaquePanels provides (opaque || LocalOpaquePanels.current),
-                    ) {
-                        RetainedMenuSurface(sourceKey, reduced, Modifier.matchParentSize())
+                    if (editing) {
+                        CompositionLocalProvider(
+                            LocalOpaquePanels provides (opaque || LocalOpaquePanels.current),
+                        ) {
+                            RetainedMenuSurface(sourceKey, reduced, Modifier.matchParentSize())
+                        }
                     }
                     Column(
                         Modifier.verticalScroll(rememberScrollState())
-                            .padding(24.dp),
+                            .padding(if (editing) 24.dp else 0.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         if (editing) {
@@ -303,7 +324,7 @@ fun ProfilePanel(
                                             enabled = !saving && snapshot.profiles.size < 12,
                                             modifier =
                                                 Modifier.size(96.dp)
-                                                    .glassSurface(radius = 48.dp)
+                                                    .glassSurface(opaque = opaque, radius = 48.dp, treatment = GlassTreatment.CLEAR)
                                                     .onPreviewKeyEvent { event ->
                                                         if (
                                                             snapshot.profiles.size < 2 &&
@@ -326,7 +347,11 @@ fun ProfilePanel(
                                             colors =
                                                 ButtonDefaults.colors(
                                                     containerColor = Color.Transparent,
+                                                    focusedContainerColor = Color.Transparent,
+                                                    pressedContainerColor = Color.Transparent,
                                                     contentColor = glassControlForeground(),
+                                                    focusedContentColor = glassControlForeground(),
+                                                    pressedContentColor = glassControlForeground(),
                                                 ),
                                             contentPadding = PaddingValues(12.dp),
                                         ) {
@@ -447,4 +472,17 @@ fun ProfilePanel(
             }
         }
     }
+}
+
+/** Sample the Activity scene behind this native dialog without repainting the reduced-size copy. */
+@Composable
+private fun ProfileSceneSource(backdrop: ImageBitmap, source: dev.chrisbanes.haze.HazeState) {
+    Image(
+        backdrop,
+        null,
+        Modifier.fillMaxSize()
+            .drawWithContent { clipRect(0f, 0f, 0f, 0f) { this@drawWithContent.drawContent() } }
+            .hazeSource(source),
+        contentScale = ContentScale.FillBounds,
+    )
 }

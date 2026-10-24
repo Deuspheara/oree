@@ -359,7 +359,7 @@ the complete saved section, rather than being clamped to a temporary heading-onl
 
 Settings renders only its current level, in one centered column: categories, category content,
 or a choice page. Back returns a level; Left is not required. Nested Settings pages cover the
-parent content. The visual setup screen places a five-stop intensity rail above a bounded live
+parent content. The visual setup screen places a six-stop intensity rail above a bounded live
 preview and an explicit Finish/Apply action. Browsing the rail does not save preferences.
 Folder hover shows miniature app artwork without the redundant instruction. Continue Watching
 extends to both screen edges while the first resting card and heading share the 80 dp inset.
@@ -371,4 +371,4 @@ quality remain unchanged; oversized cache requests use the original live drawing
 
 ## Live glass and profiles
 
-The profile switcher and editor share a source-backed panel with consistent padding. Selection remains distinct from focus. Settings rows retain their selected fill and semantics without the left accent stripe. The final Visual experience step selects live Haze optics; other presets retain the existing bounded renderer.
+The profile switcher floats avatar and Add Profile circles directly over Home, without a rectangular backing. Only the editor has a panel. The Add Profile circle samples a bounded copy of the visible Activity scene, including Watch Next artwork, and retains transparent button fills when focused or pressed. Selection remains distinct from focus. Settings rows retain their selected fill and semantics without the left accent stripe. The final Visual experience step selects live Haze optics; other presets retain the existing bounded renderer.
