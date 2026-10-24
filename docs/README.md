@@ -20,6 +20,7 @@ Start with [Contributing](../CONTRIBUTING.md). These pages describe the current 
 - [Architecture](ARCHITECTURE.md) and [rendering notes](RENDERING_EXPLORATION.md)
 - [Testing](TEST_PLAN.md) and [performance measurement](development/PERFORMANCE.md)
 - [Dependencies](dependencies/README.md), [third-party notices](../THIRD_PARTY.md) and [security](../SECURITY.md)
+- [Website and GitHub Pages](WEBSITE.md)
 - [Public source preparation](PUBLICATION.md)
 
 Historical experiments and their detailed results remain in Git history. Current user guides do not use those mixed experiments as slider-level FPS comparisons.

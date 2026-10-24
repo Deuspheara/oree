@@ -40,6 +40,7 @@ Profiles keep separate launcher layouts and appearances. They do not switch acco
 - [Build and install](docs/GETTING_STARTED.md)
 - [Visual quality and performance](docs/PERFORMANCE.md)
 - [Folders](docs/FOLDER_MANAGEMENT.md), [content and photos](docs/CONTENT_CAPABILITIES.md), [compatibility](docs/ANDROID_COMPATIBILITY.md)
+- [Product website and GitHub Pages setup](docs/WEBSITE.md)
 - [All documentation](docs/README.md)
 - [Contributing](CONTRIBUTING.md) and [public source preparation](docs/PUBLICATION.md)
 

@@ -40,3 +40,6 @@ signing.properties
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Generated public website
+.site-build/
