@@ -3,18 +3,6 @@ name: Website
 on:
   push:
     branches: [main]
-    paths:
-      - 'site/**'
-      - 'scripts/build-site.py'
-      - 'scripts/check-site.py'
-      - 'docs/screenshots/home.png'
-      - 'docs/screenshots/profiles.png'
-      - 'assets/avatars/masters/avatar_01.png'
-      - 'assets/avatars/masters/avatar_03.png'
-      - 'core/platform/src/main/res/drawable-nodpi/landscape_forest.jpg'
-      - 'core/model/src/main/java/fr/deuspheara/oree/core/model/VisualExperience.kt'
-      - 'core/designsystem/src/main/res/values/strings.xml'
-      - '.github/workflows/pages.yml'
   pull_request:
     paths:
       - 'site/**'
