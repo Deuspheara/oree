@@ -1,6 +1,6 @@
 # Oree brand assets
 
-The TV banner uses the website's lowercase `oree.` wordmark on graphite. The square launcher icon uses the website favicon's tilted orbit on deep green.
+The TV banner uses the website's lowercase `oree.` wordmark on black. The square launcher icon uses the website favicon's tilted orbit in white on black.
 
 - `wordmark.svg`: transparent, outlined wordmark master, with a circular terminal dot. The lettering was outlined from Helvetica Neue Bold; no font file is included or needed at runtime.
 - `orbit.svg`: original website favicon geometry and colors. Its rounded square is a website treatment; Android supplies its own adaptive mask.
