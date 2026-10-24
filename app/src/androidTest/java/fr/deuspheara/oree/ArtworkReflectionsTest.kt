@@ -40,6 +40,7 @@ class ArtworkReflectionsTest {
                 bitmap,
                 ((result as SuccessResult).image as coil3.BitmapImage).bitmap,
             )
+            cache.awaitColors(key)
         }
         try {
             for (y in 0 until 160) {
@@ -102,11 +103,12 @@ class ArtworkReflectionsTest {
                     hardware,
                     (result.image as coil3.BitmapImage).bitmap,
                 )
-                assertEquals(Color.GREEN, cache.colors(hardwareKey)!!.center)
+                assertEquals(Color.GREEN, cache.awaitColors(hardwareKey)!!.center)
             } finally {
                 hardware.recycle()
             }
         } finally {
+            cache.clear()
             loader.shutdown()
             bitmap.recycle()
         }

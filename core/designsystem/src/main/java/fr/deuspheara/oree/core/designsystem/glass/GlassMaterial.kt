@@ -37,8 +37,9 @@ import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.LocalGlassAccessibilitySettings
+import dev.chrisbanes.haze.glass.LocalGlassStyle
 import dev.chrisbanes.haze.glass.RefractionProfile
-import dev.chrisbanes.haze.glass.hazeGlass
 import dev.chrisbanes.haze.hazeSource
 import fr.deuspheara.oree.core.designsystem.theme.DesignTokens
 
@@ -46,6 +47,9 @@ val LocalGlassSource = staticCompositionLocalOf<HazeState?> { null }
 
 // This policy changes during navigation; invalidate its readers rather than the whole scene.
 val LocalOpaquePanels = compositionLocalOf { false }
+
+/** Opt-in live Haze optics and continuous card motion, with a higher GPU workload. */
+val LocalLiveGlass = staticCompositionLocalOf { false }
 
 val LocalLiquidGlass = staticCompositionLocalOf { true }
 val LocalGlassIntensity = staticCompositionLocalOf { .75f }
@@ -97,12 +101,21 @@ fun WallpaperBackground(
             Image(
                 frost,
                 null,
-                Modifier.fillMaxSize().graphicsLayer { alpha = diffusion },
+                // This leaf draws one bitmap: apply opacity to the draw instead of a
+                // full-screen intermediate group-alpha target.
+                Modifier.fillMaxSize().graphicsLayer {
+                    alpha = diffusion
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                },
                 contentScale = ContentScale.Crop,
             )
         }
         Box(
-            Modifier.fillMaxSize().graphicsLayer { alpha = diffusion }
+            // One rectangle: modulate its draw alpha instead of allocating a group-alpha buffer.
+            Modifier.fillMaxSize().graphicsLayer {
+                alpha = diffusion
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }
                 .background(Color.Black.copy(alpha = .25f)),
         )
         Box(
@@ -159,7 +172,8 @@ fun Modifier.glassSurface(
 ): Modifier {
     val source = LocalGlassSource.current
     val split = LocalSplitWallpaperGlass.current
-    val useSplit = split != null && split.original === source && split.available.value &&
+    val liveGlass = LocalLiveGlass.current
+    val useSplit = !liveGlass && split != null && split.original === source && split.available.value &&
         treatment == GlassTreatment.CLEAR && progressive == null && performanceMode == HazePerformanceMode.Balanced
     val shape = RoundedCornerShape(radius)
     val surface = DesignTokens.surface
@@ -167,6 +181,11 @@ fun Modifier.glassSurface(
         LocalGlassIntensity.current.let { if (it.isFinite()) it.coerceIn(.25f, 1f) else .75f }
     val fallback = usesOpaqueGlass(opaque)
     val lightMenu = DesignTokens.background.luminance() > .5f && role == GlassSurfaceRole.MENU
+    val accessibility = LocalGlassAccessibilitySettings.current
+    val prepareOpticalMap = !liveGlass && split != null && treatment == GlassTreatment.CLEAR && progressive == null &&
+        performanceMode == HazePerformanceMode.Balanced && !fallback && !lightMenu &&
+        !accessibility.reduceTransparency && !accessibility.increaseContrast && !accessibility.showBorders &&
+        LocalGlassStyle.current === GlassStyle
     val style =
         remember(shape, intensity, treatment, lightMenu, progressive, useSplit) {
             GlassStyle.clear.then {
@@ -221,10 +240,14 @@ fun Modifier.glassSurface(
                     Modifier
                 },
             )
-            .hazeGlass(
+            .mappedGlassOrHaze(
                 input = HazeInput.Sources(if (useSplit) split!!.filtered else source),
-                style = style,
-                performanceMode = performanceMode,
+                fallbackStyle = style,
+                performanceMode = if (liveGlass) HazePerformanceMode.Quality else performanceMode,
+                radius = radius,
+                intensity = intensity,
+                prepare = prepareOpticalMap,
+                usePreparedInput = useSplit,
             )
             .then(if (lightMenu) Modifier.background(Color.White.copy(alpha = .62f)) else Modifier)
     }

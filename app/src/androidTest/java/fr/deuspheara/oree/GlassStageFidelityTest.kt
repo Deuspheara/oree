@@ -35,6 +35,7 @@ import fr.deuspheara.oree.core.designsystem.glass.GlassTreatment
 import fr.deuspheara.oree.core.designsystem.glass.LocalGlassIntensity
 import fr.deuspheara.oree.core.designsystem.glass.LocalGlassSource
 import fr.deuspheara.oree.core.designsystem.glass.LocalLiquidGlass
+import fr.deuspheara.oree.core.designsystem.glass.LocalPrecomputedGlass
 import fr.deuspheara.oree.core.designsystem.glass.LocalSplitWallpaperGlass
 import fr.deuspheara.oree.core.designsystem.glass.SplitWallpaperGlass
 import fr.deuspheara.oree.core.designsystem.glass.WallpaperBackground
@@ -97,6 +98,7 @@ class GlassStageFidelityTest {
                     LocalSplitWallpaperGlass provides if (prefiltered) split else null,
                     LocalLiquidGlass provides true,
                     LocalGlassIntensity provides 1f,
+                    LocalPrecomputedGlass provides (InstrumentationRegistry.getArguments().getString("precomputedOptics") != "false"),
                 ) {
                     Box(Modifier.fillMaxSize()) {
                         WallpaperBackground(image, false, frost, softened)

@@ -212,6 +212,7 @@ private fun ExperienceRail(
     val foreground = D.foreground
     val label = stringResource(R.string.visual_experience)
     val selectedLabel = stringResource(experienceTitle(VisualExperience.entries[index]))
+    val lastIndex = VisualExperience.entries.lastIndex
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         Text(stringResource(R.string.experience_less), color = D.secondary, fontSize = 14.sp)
         Canvas(
@@ -240,12 +241,12 @@ private fun ExperienceRail(
                 .semantics {
                     contentDescription = label
                     stateDescription = selectedLabel
-                    progressBarRangeInfo = ProgressBarRangeInfo(index.toFloat(), 0f..4f, 3)
+                    progressBarRangeInfo = ProgressBarRangeInfo(index.toFloat(), 0f..lastIndex.toFloat(), lastIndex - 1)
                     setProgress {
                         if (!enabled || !it.isFinite()) {
                             false
                         } else {
-                            onChange(it.roundToInt().coerceIn(0, 4))
+                            onChange(it.roundToInt().coerceIn(0, lastIndex))
                             true
                         }
                     }
@@ -256,11 +257,11 @@ private fun ExperienceRail(
             val y = size.height / 2
             val height = 6.dp.toPx()
             drawRoundRect(foreground.copy(alpha = .2f), Offset(inset, y - height / 2), Size(width, height), CornerRadius(height))
-            repeat(5) {
-                val fraction = if (direction == LayoutDirection.Rtl) 1f - it / 4f else it / 4f
+            repeat(VisualExperience.entries.size) {
+                val fraction = if (direction == LayoutDirection.Rtl) 1f - it.toFloat() / lastIndex else it.toFloat() / lastIndex
                 drawCircle(foreground.copy(alpha = .55f), 3.dp.toPx(), Offset(inset + width * fraction, y))
             }
-            val fraction = if (direction == LayoutDirection.Rtl) 1f - index / 4f else index / 4f
+            val fraction = if (direction == LayoutDirection.Rtl) 1f - index.toFloat() / lastIndex else index.toFloat() / lastIndex
             val thumbWidth = 40.dp.toPx()
             val thumbHeight = (if (focused) 22.dp else 18.dp).toPx()
             drawRoundRect(
@@ -283,6 +284,7 @@ private fun experienceTitle(level: VisualExperience) = when (level) {
     VisualExperience.BALANCED -> R.string.experience_balanced
     VisualExperience.RICH -> R.string.experience_rich
     VisualExperience.FULL -> R.string.experience_full
+    VisualExperience.LIVE_GLASS -> R.string.experience_live_glass
 }
 private fun experienceDescription(level: VisualExperience) = when (level) {
     VisualExperience.SIMPLE -> R.string.experience_simple_body
@@ -290,4 +292,5 @@ private fun experienceDescription(level: VisualExperience) = when (level) {
     VisualExperience.BALANCED -> R.string.experience_balanced_body
     VisualExperience.RICH -> R.string.experience_rich_body
     VisualExperience.FULL -> R.string.experience_full_body
+    VisualExperience.LIVE_GLASS -> R.string.experience_live_glass_body
 }

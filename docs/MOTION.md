@@ -98,7 +98,7 @@ reflection. Focus changes stay in local presentation state; settled app-preview 
 isolated from Home composition. Tilt axes share one offset animation with the same spring.
 Settings focus memory does not invalidate its list when the selected row changes.
 
-The visual setup rail previews Simple, Light, Balanced, Rich and Full. These are relative
+The visual setup rail previews Simple, Light, Balanced, Rich, Full and Live Liquid Glass. These are relative
 workloads, not device capability ratings. Simple uses static focus feedback; other steps
 scale card motion and glass/blur strength. System reduced motion still takes precedence.
 The preview only animates when the selected step changes and has no idle animation.
@@ -137,3 +137,7 @@ wallpaper, 280 ms depth/veil transition and live optical motion retain their exi
 The filtered inputs share the visible wallpaper's transition, and clear controls use the
 original source until that transition settles. Opaque-source and size guards preserve the
 original rendering path for translucent images and roots above 2,097,152 pixels.
+
+## Live Liquid Glass override
+
+The sixth Visual experience step keeps card lift, tilt and reflections active during repeated directional input. Other presets retain the rapid-navigation ring policy. Explicit/system reduced motion, economy and high contrast retain their existing precedence and visible focus. Live glass uses live source optics rather than retained menu captures or precomputed optical maps. This opt-in increases workload; it does not change physical performance budgets or establish frame-rate acceptance.

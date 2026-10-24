@@ -319,4 +319,6 @@
     <string name="experience_full_body">The richest glass and backdrop effects. Uses more graphics resources.</string>
     <string name="experience_sample_apps">Apps</string>
     <string name="experience_sample_glass">Glass</string>
+    <string name="experience_live_glass">Live Liquid Glass</string>
+    <string name="experience_live_glass_body">Live Haze refraction and full focus animations, even during fast scrolling. Highest graphics workload; may reduce frame rate.</string>
 </resources>

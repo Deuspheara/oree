@@ -561,6 +561,7 @@ fun LauncherRoot(
             fr.deuspheara.oree.core.designsystem.glass.LocalSplitWallpaperGlass provides splitGlass,
             LocalLiquidGlass provides materialPreferences.liquidGlass,
             LocalGlassIntensity provides materialPreferences.glassIntensity,
+            fr.deuspheara.oree.core.designsystem.glass.LocalLiveGlass provides materialPreferences.liveGlass,
             LocalReducedTransparency provides
                 (
                     materialPreferences.reduceTransparency ||

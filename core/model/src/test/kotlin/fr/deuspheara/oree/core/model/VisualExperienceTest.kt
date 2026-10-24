@@ -32,6 +32,16 @@ class VisualExperienceTest {
         assertEquals(1f, VisualExperience.FULL.applyTo(value).motionIntensity)
     }
 
+    @Test fun liveGlassIsLastAndExplicitlyOptedIn() {
+        assertEquals(VisualExperience.LIVE_GLASS, VisualExperience.entries.last())
+        assertFalse(LauncherPreferences().liveGlass)
+        for (level in VisualExperience.entries) {
+            val value = level.applyTo(LauncherPreferences(liveGlass = true))
+            assertEquals(level == VisualExperience.LIVE_GLASS, value.liveGlass)
+            assertEquals(level, VisualExperience.nearest(value))
+        }
+    }
+
     @Test fun motionInputIsBoundedAndLegacyDefaultEffectIsPreserved() {
         assertEquals(1f, LauncherPreferences().motionIntensity)
         assertEquals(1f, LauncherPreferences(motionIntensity = Float.NaN).normalized().motionIntensity)

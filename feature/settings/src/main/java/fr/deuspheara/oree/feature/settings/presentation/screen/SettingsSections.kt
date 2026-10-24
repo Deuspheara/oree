@@ -234,7 +234,7 @@ internal fun LazyListScope.appearanceSettings(
                         value.copy(
                             theme = defaults.theme, quality = defaults.quality,
                             reduceMotion = defaults.reduceMotion, reduceTransparency = defaults.reduceTransparency,
-                            motionIntensity = defaults.motionIntensity,
+                            motionIntensity = defaults.motionIntensity, liveGlass = defaults.liveGlass,
                             highContrast = defaults.highContrast, textScale = defaults.textScale,
                             liquidGlass = defaults.liquidGlass, glassIntensity = defaults.glassIntensity, accent = defaults.accent,
                         ),

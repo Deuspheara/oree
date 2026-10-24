@@ -27,6 +27,30 @@ class HomeCardResponseTest {
     )
 
     @Test
+    fun liveGlassKeepsLiftDuringRepeatsButReducedMotionStillWins() {
+        var live by mutableStateOf(false)
+        var reduced by mutableStateOf(false)
+        compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                fr.deuspheara.oree.core.designsystem.glass.LocalLiveGlass provides live,
+                fr.deuspheara.oree.core.designsystem.artwork.LocalFastNavigation provides true,
+            ) {
+                Column(Modifier.padding(32.dp)) {
+                    FocusArtwork(true, false, reduced, Offset.Zero, Modifier.size(200.dp, 100.dp), immediateFocus = true) {
+                        Box(Modifier.size(200.dp, 100.dp).testTag("repeat-focus"))
+                    }
+                }
+            }
+        }
+        fun width() = compose.onNodeWithTag("repeat-focus").fetchSemanticsNode().boundsInRoot.width
+        val base = width()
+        compose.runOnIdle { live = true }
+        assertTrue("Live glass retains full lift during repeated navigation", width() >= base * 1.099f)
+        compose.runOnIdle { reduced = true }
+        assertTrue("Reduced motion still overrides live glass", width() <= base * 1.001f)
+    }
+
+    @Test
     fun immediateLiftCompletesWithinTwoFramesAndReleasesWithoutTail() {
         var focused by mutableStateOf(false)
         compose.setContent {

@@ -1,5 +1,39 @@
 # Testing
 
+## Transparency regression verification — 24 October 2026
+
+The user subsequently authorized repair and physical millisecond comparisons. The experimental
+direct wallpaper snapshots were removed after opaque dock/header output in transparent mode.
+Production now retains the live mapped/Haze input path; the obsolete direct-path comparison
+argument and capture helpers are removed. The initial source-only handoff is historical.
+
+Verify actual transparent dock/header rendering after initial loading, first scroll/reversal,
+wallpaper replacement, source resizing/reattachment, separate-window glass and opaque override.
+Use WallpaperBackgroundTest, HazeGlassTest and the opaque split/precomputed variant of
+GlassStageFidelityTest. Hardware-window captures establish sampled appearance only.
+
+ArtworkReflectionsTest waits for optional palette completion before changing its fixture.
+WallpaperBlurTest adds a seeded comparison with the original neighborhood-sum algorithm across
+narrow/small images and all radii. Use matched optimized A1/B1/B2/A2 vertical tours and trace
+quality, scene, input and focus checks for timing; preserve and compare configured files and
+restore the exact corrected APK. Record actual outcomes separately from these requirements.
+
+## Inward glass sampling bounds — 24 October 2026
+
+`GlassOpticalMapTest.inwardBilinearSamplesStayInsideUnpaddedMaterials` checks every pixel
+centre of representative dock, header, minimum-eligible, narrow and low-density materials,
+including nine-patch stitching and bilinear numeric-channel sampling at maximum displacement.
+Tiny materials keep their original padding. Preserve this invariant if changing the map field.
+
+The accepted smaller-bounds build passes all seven physical `WallpaperBackgroundTest`,
+`HazeGlassTest`, `ArtworkReflectionsTest` and opaque/split `GlassStageFidelityTest` cases.
+Twenty comparable captured movement/source/resize frames differ from the preceding control
+by at most one channel level; the initial frozen-clock capture is not pixel-comparable because
+asynchronous optical-map readiness differs. Both initial appearances retain a visible source.
+All twelve final optimized ABBA timing traces pass quality, delivered-input, native-focus,
+visible-scene and mapped-path/no-fallback checks. See Performance for complete blocks,
+rejected experiments and the slower initial control iteration; compilation is not acceptance.
+
 ## Build gates
 
 Use the pinned wrapper and JDK 21:
@@ -264,3 +298,40 @@ existing reduced-motion, navigation/reversal, Settings-return and lifecycle case
 Compare the exact final optimized APK on the physical TV for first-entry and rapid vertical
 scrolling, validate actual events/focus/scenes and trace quality, and keep resource queries
 outside timed bursts. See PERFORMANCE.md for the tested source, measured scope and limits.
+
+For precomputed optics, pass `-e precomputedOptics true` with the prepared opaque fixture,
+and `-e precomputedOptics false` for the Haze control. Keep the alpha-source variant and
+`WallpaperBackgroundTest`/`HazeGlassTest`, plus the real Settings-return lifecycle case.
+Check `Oree:mapped-glass-optics` and absence of `Oree:mapped-glass-fallback` in a bounded
+functional trace so fallback cannot silently substitute for the renderer under test. These
+frozen-clock captures verify sampled source freshness and appearance, not frame pacing.
+`GlassOpticalMapTest` covers inward/symmetric displacement, neutral-center compression,
+allocation guards and row-boundary cancellation on the host JVM without an emulator.
+
+The repaired source's required local gates and seven targeted physical cases passed on
+24 October 2026. The actual optimized dock/header transparency was inspected, and twelve
+rapid vertical traces were collected. A provider identity refresh splits the run into two
+scene groups, so the result is a small primary frame-duration difference with no demonstrated
+overall speedup; see the transparent-glass repair section in PERFORMANCE.md. This does not
+close broader performance, startup, memory or compatibility acceptance.
+
+
+### Visible-wallpaper fusion follow-up (2026-10-24)
+
+Three isolated wallpaper-paint/cache variants pass eight focused physical rendering cases
+and required local gates but do not establish a repeatable timing win. The conditional cached
+screen fails overrun nonregression; branchless cached confirmation is invalidated by provider
+identity changes between blocks; direct drawing fails the matched return presentation-p95
+comparison and worsens typical completion/deadline misses. All experimental production and
+fixture changes are reverted. The preceding accepted smaller-bounds source and exact APK
+are restored and revalidated locally. Final physical Home transparency, APK/source identity,
+configured wallpaper/preferences and default HOME preservation are checked separately.
+See Performance for every block and the excluded disconnected instrumentation attempt.
+
+## Live glass and public documentation captures
+
+`HomeCardResponseTest.liveGlassKeepsLiftDuringRepeatsButReducedMotionStillWins` checks that live mode retains lift under repeated navigation and that reduced motion wins. `ProfileExperienceCodecTest` covers profile/backup round trips, the legacy default and malformed imported live-glass values. `ProfileMenuVisualTest` includes live optics alongside the existing accessibility/palette matrix.
+
+Run `PublicScreenshotsTest` directly on a physical TV for project-only Home, profile and quality-rail documentation scenes. It uses in-memory sample profiles/apps and original bundled wallpaper without writing configured stores. Curated documentation exports may be tracked under `docs/screenshots/`; personal captures, APKs, device identifiers and raw verification evidence remain private. Screenshots establish appearance only, not timing.
+
+Verification on 24 October 2026: required Gradle gates and avatar export validation pass. The final physical API 34 suite passes 20 tests across PublicScreenshots, HomeCardResponse, ProfileExperienceCodec, ProfileMenuVisual, ProfilePanel and VisualExperience. Configured DataStore files compare unchanged before/after the suite; default HOME remains unchanged. Documentation screenshots are reviewed sample scenes. These runs establish the covered functional and appearance behavior, without new frame-time or broad compatibility claims.

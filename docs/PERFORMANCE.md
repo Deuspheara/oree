@@ -1537,3 +1537,491 @@ DataStore and wallpaper bytes match the task-start archive after restoring the a
 to its original 0. The exact tested optimized APK is replacement-installed, pulled back and
 hash-verified, then explicitly started. Default HOME is unchanged. No public push or release
 was performed. Raw preservation and deployment evidence remains outside tracked source.
+
+## Incremental GPU work review — veil compositing
+
+The next change removes only the wallpaper veil's intermediate group-alpha surface.
+Both the visible wallpaper and prepared glass source keep their existing black rectangle
+and animated opacity, but use `CompositingStrategy.ModulateAlpha`. These leaf layers contain
+one rectangle, no children and no RenderEffect. Applying layer opacity directly to that
+draw has the same source-over equation as applying opacity to its isolated group:
+`effectiveAlpha = 0.25 * diffusion`. Rendering may still differ by intermediate-buffer
+rounding; pixel identity has not been established for this change.
+
+Compose's [graphics modifier documentation](https://developer.android.com/develop/ui/compose/graphics/draw/modifiers#modulatealpha)
+explains that this strategy avoids the offscreen buffer otherwise used for fractional
+layer alpha, provided no RenderEffect is set. Its overlapping-content caveat is why the
+strategy is restricted to the veil leaves. The sharp/frost filters and image/gradient groups
+retain their existing compositing. The full-screen rectangle still draws; this removes an
+intermediate target and its composition, not all veil bandwidth or all wallpaper passes.
+The opportunity occurs at intermediate diffusion values; settled opacity zero/one already
+avoids the default fractional-alpha buffer. No measured frame-time or memory gain is claimed.
+
+### Research and existing implementation
+
+Review the exact pinned Haze 2.0.1 sources rather than assuming an unoptimized physical
+renderer. Its [glass shaders](https://github.com/chrisbanes/haze/blob/2.0.1/haze-glass/src/commonMain/kotlin/dev/chrisbanes/haze/glass/GlassShaders.kt)
+already use rounded-rectangle signed distances, analytical displacement and a Fresnel-like
+ambient term. The exponent-three path uses multiplication. Its
+[Android backend](https://github.com/chrisbanes/haze/blob/2.0.1/haze-glass/src/androidMain/kotlin/dev/chrisbanes/haze/glass/GlassRenderEffectFactory.android.kt)
+supports the [fused renderer](https://github.com/chrisbanes/haze/blob/2.0.1/haze-glass/src/commonMain/kotlin/dev/chrisbanes/haze/glass/RuntimeShaderGlassDelegate.kt),
+which combines optical operations rather than requiring a separate pass for each authored
+property. Source inspection establishes available paths, not physical GPU pass counts.
+
+The remaining directions have different costs and fidelity constraints:
+
+| Direction | Assessment for the current renderer |
+|---|---|
+| Dual-Kawase / dual filtering | [Arm's bandwidth-efficient rendering work](https://community.arm.com/cfs-file/__key/communityserver-blogs-components-weblogfiles/00-00-00-20-66/siggraph2015_2D00_mmg_2D00_marius_2D00_notes.pdf) uses downsample/upsample chains for broad blur. Oree already prepares broad diffusion once at 192×108. The remaining clear-glass filter is only 1.25 dp times intensity; replacing it with a pyramid adds intermediates and changes the kernel. Keep the current kernel for this increment. |
+| Schlick Fresnel | [Filament](https://google.github.io/filament/main/filament.html#materialsystem/specularbrdf/fresnel(specularf)) describes the inexpensive fifth-power approximation. Haze's authored ambient response is a different visual curve; replacing it is a material change, not an algebraically identical simplification. |
+| Signed-distance fields | Already used by Haze for silhouette and optical geometry. Retain the existing analytical path and full-resolution output shape. |
+| Optical lookup tables | A table trades arithmetic for texture reads, storage and interpolation. It must reproduce size, corner radii, density and optical parameters and preserve moving source coordinates. There is no isolated shader-cost evidence yet to justify the extra sampling or a fork. |
+| Half/quarter-resolution diffusion | The broad frost bitmap is already smaller than quarter resolution. The root-sized prepared filtered layers are still a bandwidth/cache opportunity. Haze Balanced is a quality policy, not a promised half-resolution buffer. Reducing prepared-layer resolution also changes gradient filtering and shallow detail; do not silently lower the existing policy. |
+| Dock-region caching | A crop must include the union of moving sample bounds, refraction displacement, filter support and other clear-glass consumers. It must retain wallpaper-global coordinates and refresh on source, size, density or optical changes. Cropping to only the resting dock rectangle risks stale/missing samples during scroll and Overview transforms. |
+| Pass fusion and reuse | Haze already retains resources and offers fused optics. The application retains separate stationary sharp/frost inputs; diffusion changes their blend. Remove the simple redundant veil intermediate first, keeping all optical parameters and sampling unchanged. |
+
+The source-over argument is sufficient to scope this leaf-only change, not to certify its
+appearance on every renderer. Existing wallpaper intermediate-frame, replacement and prepared
+source fixtures remain the relevant correctness cases. No additional TV benchmark campaign,
+replacement install or device interaction is part of this increment. Previous physical timings,
+memory measurements and native-window comparisons belong to the previous APK; they must not
+be attributed to this source revision. Build gates are recorded separately from device
+acceptance, and all existing performance budgets remain in force.
+
+Local verification passed: Spotless, `verifyArchitecture`, module tests, Debug lint,
+Debug and optimized APK builds, instrumentation/benchmark compilation, avatar validation
+and `git diff --check`. No new device fidelity or performance result is claimed.
+
+## Precomputed optical renderer — manual validation build
+
+Eligible clear controls can now use a compact, geometry-only two-dimensional optical map
+through Haze's public custom-effect API. Rounded corners and edge bands retain physical
+coordinates in a compressed nine-patch field; the neutral interior collapses. A 65-sample
+Snell/Schlick profile drives precomputed inward displacement; fixed directional rim lighting
+is baked into the same raw RGBA buffer. Map dimensions are capped at 256 per axis (256 KiB),
+with half-resolution edge sampling. Generation runs on Default, is geometry-keyed and
+cancellable, and does not run during scrolling or source-pixel changes. The existing split
+sharp/frost background preparation remains intact.
+
+The shader uses one linearly interpolated numeric map read and one live backdrop read,
+without per-pixel SDF, normal reconstruction, refraction equations or specular powers. The
+renderer owns one padded full-resolution source GraphicsLayer; source commands remain live
+for movement, source replacement and depth blending. Compared with Haze Balanced, this
+full-resolution capture can cost more input bandwidth; fewer optical operations/layers are
+an expected tradeoff, not measured acceleration. Full-resolution Compose clipping preserves
+the silhouette, while the baked light and shallow lens profile intentionally change the look.
+
+Haze remains selected while the map is pending, during wallpaper crossfades, for unsupported
+geometry/materials/accessibility overrides and after map/shader failures. The failure frame
+keeps current input pixels before recomposition restores Haze. LocalPrecomputedGlass disables
+the new path for comparisons. No Haze fork, additional dependency, persisted preference or
+physical-TV benchmark was introduced. The user requested optimized compilation and ADB
+deployment only, overriding the planned local/emulator checks; no tests or emulator were run.
+Visual and performance acceptance belong to the user's manual validation of this APK.
+
+References reviewed: [sohumsuthar](https://github.com/sohumsuthar/liquid-glass),
+[Meapri](https://github.com/Meapri/liquid-glass-web),
+[LeonardSEO](https://github.com/LeonardSEO/liquid-glass-react), and pinned Haze 2.0.1 shaders,
+fused rendering, input-scale policy and public HazeEffectRenderer/DrawScope APIs. The native
+Android implementation is authored for Oree rather than embedding the web renderers.
+
+### Physical verification after the manual build
+
+The user subsequently authorized physical-TV testing; no emulator was used. On the physical
+API 34 TV, the mapped opaque fixture, all four WallpaperBackgroundTest cases and HazeGlassTest
+pass (six cases). The same movement/source/resize fixture passes again with maps disabled,
+and with translucent wallpaper falling back to Haze. Three real Settings visits restore Home
+and native header focus in the lifecycle case. These are nine test executions across seven
+distinct methods; overlapping fixture variants must not be counted as distinct cases.
+
+The bounded functional trace records 19 `Oree:mapped-glass-optics` sections and no
+`Oree:mapped-glass-fallback` sections, with no reported trace errors/loss. Thus the test
+exercised the new renderer rather than only its fallback. Synthetic native-window captures
+were reviewed beside the Haze control, including the intentionally different rim and lens.
+A frozen resize frame can show the current input before the asynchronous replacement map
+is applied; this is not evidence of continuous optical quality during arbitrary resizing.
+Shader-failure recovery was not fault-injected. The fallback helper now preserves source
+alignment on its temporary frame. No frame-time/GPU-time improvement is inferred from these
+traced, screenshot-producing correctness tests.
+
+All required local gates pass, including four new optical-map unit cases, formatting,
+architecture, module tests, lint and optimized/instrumentation/benchmark compilation; avatar
+validation and diff whitespace checks pass. A mistakenly module-qualified formatter task
+was unavailable; the root formatter succeeded. An intermediate fallback-helper scope
+qualification failed compilation and was corrected before any test APK was installed.
+Configured DataStore/wallpaper files are byte-identical before/after instrumentation. The
+optimized APK was restored, pulled back and hash-verified, explicitly started and visually
+inspected on Home; default HOME is unchanged. Private source/APK manifests, raw traces,
+captures and data archives remain outside tracked source. Final source SHA256 is
+`f99105a5b4fc348af37a92b2463918c8391ba2473a03859f0692d68cc2de88c0`;
+optimized APK SHA256 is `e1fc1aee6fa9981defa52e356a174c62e94e71ee79b3d02a1d98807e370e725a`.
+
+### Optical renderer timing comparison — 24 October 2026
+
+The new renderer improves the measured rapid vertical scrolling workload on the physical API 34
+TV. A is the previous optimized Haze renderer with split backgrounds and veil modulation; B is
+the mapped renderer already installed for manual validation. Both use the current Balanced
+profile, full motion, intensity .85, background blur .8 and the same wallpaper. No application
+code or visual settings changed during the comparison.
+
+The planned A1/B1/B2/A2 order completed with three measured iterations and three Partial/Require
+compilation warmups per block. Each measured iteration follows one priming tour with three
+six-Down/six-Up tours at a native 180 ms cadence and a 700 ms tail. Processes restart in setup;
+OS/file/image/driver caches remain. No emulator, cold-cache run, memory query or screenshot was
+used during timed bursts.
+
+The live Twitch entry changed between A1 and B1. A1 is excluded from the primary comparison
+rather than pooled as a matched baseline. B1 became the scene reference before the final
+baseline ran; B1, B2 and A2 match visible identities/text/bounds, actual delivered events and
+focus walks. The retained matched subset is therefore B/B/A, not a fully matched ABBA. Each
+B block independently shows the gain relative to the return baseline. The unmatched A1 supports
+its direction only (CPU p95 72.37 ms, overrun p95 114.16 ms).
+
+| p95 metric | Haze A2 | Mapped B1+B2 | Reduction |
+|---|---:|---:|---:|
+| CPU frame duration | 71.72 ms | 39.69 ms | 44.7% |
+| Macrobenchmark frame overrun | 114.97 ms | 56.55 ms | 50.8% |
+| GPU-inclusive app completion | 101.82 ms | 57.14 ms | 43.9% |
+| Actual app start to display presentation | 127.48 ms | 81.92 ms | 35.7% |
+
+The App Deadline Missed classification falls from 313/878 (35.65%) to
+135/2315 (5.83%). This is not the proportion of all late-presented frames; buffer queueing remains.
+The <1% missed-deadline budget is still unmet. CPU median improves 33.56→26.95 ms; actual-start
+to presentation median improves 72.39→65.19 ms. CPU p99 improves 99.55→62.10 ms and overrun p99
+173.47→101.06 ms. Candidate block CPU p95 values are 39.40/39.66 ms and overrun p95 values
+56.52/56.54 ms, so the repeated candidate result is close. Pooled values use linear-interpolated
+quantiles over correlated frames; they are not independent frame-level trials or confidence bounds.
+
+All twelve traces pass the existing quality checker. All six candidate measured traces contain
+mapped optical markers (1,338 draws in total) and zero mapped shader-fallback markers. Complete
+app frames join uniquely to expected app and completed display frames, with valid predictions
+and no presentation-before-completion anomalies. Custom completion/presentation statistics
+exclude unfinished app slices. Native app completion includes GPU completion/buffer posting;
+presentation uses mapped SurfaceFlinger display end. Neither isolates shader execution or
+measures remote-button-to-first-changed-pixel latency. The different baked rim/lens is intentional;
+this is the complete shipped renderer comparison, not an identical-pixel optics equivalence test.
+
+Both APKs share the same 34 asset/resource entries; only generated baseline-profile binaries
+differ. No GPU bandwidth, energy, first-entry, startup or long-duration memory/thermal claim
+follows from this rapid-scrolling result. The first unmatched baseline and the single matched
+return baseline limit independent confirmation. No performance budget was relaxed.
+
+Configured files match the pre-run archive byte-for-byte. The exact B optimized APK was
+restored, pulled back and hash-verified, then explicitly started; default HOME is unchanged.
+A APK SHA256: `d0a9d7454693b79e31acfc92c2705ff1051312165736237aaa769753310656e9`.
+B APK SHA256: `e1fc1aee6fa9981defa52e356a174c62e94e71ee79b3d02a1d98807e370e725a`.
+Source SHA256: `f99105a5b4fc348af37a92b2463918c8391ba2473a03859f0692d68cc2de88c0`.
+Full raw events, traces, provider scene details, manifests and data archives remain private.
+
+## Rendering implementation for user testing — 24 October 2026
+
+The user subsequently authorized implementing the recommended improvements and explicitly
+reserved testing for themselves. No Gradle task, architecture gate, test, benchmark,
+device command or deployment was run for this revision. Earlier timing/fidelity/resource
+results above belong to earlier APKs and do not validate these changes.
+
+- Clear wallpaper-only glass can directly sample two immutable full-size prepared fields,
+  avoiding its per-control capture/RenderEffect layer once the fields and optical map are ready.
+  The fields capture the existing filtered output, including its gradient and kernel, rather
+  than replacing it with an approximate CPU blur. Their captured filter trees are removed
+  after both fields are available. Preparation uses the existing graphics-layer snapshot API
+  asynchronously, once per identity, not once per scrolling frame.
+  Frost recording occurs before opacity is applied, allowing preparation at zero frost
+  alpha instead of waiting for the first scrolling depth transition.
+- Local-to-source transforms and source-over sharp/frost/veil blending remain live. Separate
+  windows, non-affine geometry, preparation failures, unsupported inputs and pending maps use
+  the retained mapped/Haze path. LocalDirectWallpaperGlass disables direct preparation/drawing
+  for comparison without a stored preference. New direct draws carry
+  `Oree:direct-wallpaper-glass` markers. Moving the source outside its original bounds remains
+  transparent rather than clamping arbitrary edge pixels.
+- The current source-size guard bounds each field to 2,097,152 pixels. Two nominal RGBA8 fields
+  can account for up to 16 MiB before driver bookkeeping. They replace filter trees after
+  preparation, but snapshot generation can transiently overlap those trees. Actual total/peak
+  memory and driver residency are unmeasured. Lifecycle stop/trim drops prepared references;
+  a trim suppresses recapture until the next STARTED entry.
+- Both optical paths skip map sampling and rim math in the guaranteed neutral interior,
+  allowing for rounded corners and a texel of filtering support. Shape edges and existing
+  optical-map encoding remain intact. Shader branch savings have not been measured.
+- Single-bitmap frost leaves use ModulateAlpha in both the visible wallpaper and prepared
+  source blend. The opacity remains live; it is applied to the single image draw rather than
+  an additional group-alpha target. Filtered multi-draw trees retain ordinary compositing.
+- Reflection metadata no longer delays successful image delivery. Eight optional preparations
+  are allowed, with serialized scratch work and trim cancellation. Six row copies replace
+  144 individual pixel reads while retaining the same sample coordinates and color math.
+- The small wallpaper box filter uses running sums, preserving per-axis integer rounding and
+  clamped edges. Continuation app lookup uses a remembered package index with the previous
+  first-match policy. App launch bounds no longer write Compose state each scroll placement.
+
+The 12 MiB Coil cache, decode bounds, existing lazy preparation window, input rectangles,
+native focus ownership, motion timings and quality preferences are unchanged. No native
+library, new dependency or system setting is introduced. The full-scene native renderer,
+larger row caches and appearance-changing shadow substitutes remain research alternatives;
+they are not included as assumed improvements. Compilation, visual behavior, resource peaks,
+background/resume and performance still require the user's validation of this exact source.
+
+### Subsequent user-authorized deployment — 24 October 2026
+
+The user requested compilation and installation on the connected physical TV for their own
+manual testing. Offline JDK 21 `:app:assembleBenchmarkRelease` completed successfully; no tests
+or benchmark journeys ran. The optimized APK was replacement-installed, explicitly started,
+and pulled back to verify an identical SHA256:
+`a4842d1ecd41cadfd2a552328a91f8c2dea2c660de845bc2134fb064273609e2`.
+A single screen capture confirms Home is visible; it does not establish rendering fidelity,
+active direct-path selection, performance or interaction acceptance. The previous installed
+APK is preserved privately for recovery. No app data reset or default-HOME/system-setting
+change was performed. Raw APKs, capture and deployment metadata remain ignored and private.
+
+## Transparent glass repair and matched millisecond comparison — 24 October 2026
+
+The immutable wallpaper-field/direct-sampling shortcut introduced in the preceding source-only
+iteration produced black dock/header backgrounds on the physical TV despite Balanced quality,
+glass enabled, full intensity, and reduced transparency/high contrast disabled. It was removed,
+including its snapshot helpers and comparison flag. Live Haze-owned input with the split
+sharp/frost filters is restored. The exact low-level snapshot failure was not isolated; the
+before/after on-device appearance establishes the visible regression and recovery, not a
+universal claim about GraphicsLayer snapshots. Neutral-interior optics, single-image frost
+opacity, asynchronous/batched palettes, running-sum blur and the small Home lookup/bounds
+improvements remain.
+
+The corrected optimized APK was visually inspected after startup settled: the wallpaper is
+visible through both dock and header buttons. Initial loading was captured separately and
+must not be confused with a settled appearance check. Seven focused physical-TV cases pass:
+four WallpaperBackgroundTest cases, HazeGlassTest, ArtworkReflectionsTest and the opaque,
+split-input GlassStageFidelityTest. Twenty-one synthetic native-window frames were recovered;
+a settled movement/tilt frame and actual final Home were visually inspected. The test runner
+reported OK (7 tests); an initial artifact pull used the wrong directory, and a subsequent
+host-Python extraction option was unsupported. The captures were then retrieved safely from
+the app cache; neither collection error was a test failure or a timing sample.
+
+All required offline build gates pass: Spotless, architecture, module unit tests, Debug lint,
+Debug/optimized compilation, instrumentation/benchmark compilation and eight-master avatar
+validation. The previous prohibition on execution was superseded by the user's explicit
+request to fix and test timings. Mechanical formatting was applied before building.
+
+### Physical timing protocol and results
+
+A is the saved optimized APK from before the latest optimization batch, already containing
+the previous mapped-glass renderer. B is the corrected source above. This does not compare
+against the earlier, slower original Haze renderer or against the broken black-glass APK.
+Physical Smart TV Pro/API 34, 1920×1080 app surface, approximately 60 Hz. Both use the unchanged
+current Balanced profile, full motion, glass intensity 1 and background blur 1. App configuration
+and default HOME are preserved. Each A1/B1/B2/A2 block uses three Partial/Require baseline
+warmups and three measured rapid vertical tours: a priming tour, 36 native directional keys
+at 180 ms cadence and a 700 ms tail. Processes restart in setup; OS/image/driver caches remain.
+No screenshots, hierarchy dumps or resource queries run in timed bursts. Thermal state was not
+controlled, so elapsed-order variation remains a limitation.
+
+| Block | CPU-frame elapsed p95 (ms) | Deadline-overrun p95 (ms) | App-start-to-presentation p95 (ms) | App deadline misses / frames |
+| --- | ---: | ---: | ---: | ---: |
+| Before A1 | 40.80 | 56.69 | 81.92 | 69 / 1155 |
+| Corrected B1 | 40.03 | 56.93 | 86.13 | 71 / 1156 |
+| Corrected B2 | 39.72 | 56.96 | 86.84 | 72 / 1156 |
+| Before A2 | 56.60 | 81.83 | 106.11 | 91 / 1134 |
+
+All twelve measured traces pass quality checks and match delivered inputs and focus walks.
+A live provider identity refreshed between B1 and B2; text and bounds stayed the same. Each
+block is internally stable. A1/B1 match exact scene identities, and B2/A2 match each other,
+but this is not one fully matched four-block scene. The initial strict summary rejected
+cross-scene pooling as intended; raw traces and a rejection record are retained privately.
+Primary statistics use the pre-refresh A1/B1 pair. The refreshed B2/A2 pair is a separate,
+exploratory observation rather than an independently predeclared confirmation.
+
+In the primary pair, CPU-frame p95 decreases by only 0.77 ms (about 1.9%), while deadline
+overrun rises by 0.24 ms and actual-start-to-presentation p95 rises by 4.21 ms. Deadline misses
+are 5.97% versus 6.14%. The second candidate stays close, but its return baseline becomes much
+slower. That baseline variation exceeds the initial apparent gain. These results support
+**restored transparent rendering, without a demonstrated meaningful overall speedup**.
+Do not advertise the pooled result as a large gain. The <1% deadline budget remains unmet.
+
+CPU-frame duration includes pipeline waits; it is not isolated CPU execution. App completion
+includes GPU completion/buffer posting; presentation maps complete app frames to SurfaceFlinger
+frames. These measurements do not isolate shader time or physical button-to-first-changed-pixel
+latency. Both candidate blocks contain mapped optical markers in every iteration and no mapped
+shader-fallback marker. No startup, memory, energy, long-duration thermal or broad hardware
+acceptance follows from this vertical workload.
+
+Configured DataStore/wallpaper bytes match before and after benchmarking and native tests.
+Default HOME is unchanged. The corrected optimized APK was restored, explicitly started,
+pulled back and hash-verified; its transparent Home was inspected after all tests.
+A APK SHA256: `e1fc1aee6fa9981defa52e356a174c62e94e71ee79b3d02a1d98807e370e725a`.
+B APK SHA256: `d061520534d74720ef2282bedac9768bd5bf78be36400b7bce81c11a873ec55b`.
+Production source SHA256: `442201e274002dfb20932f336960830abcda69161d2a17dc75039c70090b3dc8`.
+Raw APKs, source identities, event/focus/scene records, traces, captures and preservation
+archives remain ignored in `.private/transparency-fix-20261024/`.
+
+
+## Presentation investigation and inward sampling bounds — 24 October 2026
+
+The user requested one-change-at-a-time physical-TV measurements, retaining transparent
+dock/header rendering and only keeping measured winners. The corrected transparent optimized
+APK (`d061520534d74720ef2282bedac9768bd5bf78be36400b7bce81c11a873ec55b`)
+is the control throughout. The dirty starting checkout and immutable controls were preserved;
+no earlier user/session work was reset. Raw configurations, captures, APKs and traces remain
+in ignored private evidence.
+
+### Diagnosis and rejected experiments
+
+The control traces contain substantial RenderThread drawing and UI-thread `postAndWait`
+time. In one complete control trace the app-completion-to-mapped-display-end median is
+25.04 ms, p95 27.51 ms. These are separate stages: neither CPU recording alone nor an isolated
+shader duration explains presentation latency. No GPU hardware counters were available in
+these traces, so this does not identify a pure GPU-execution bottleneck.
+
+| Isolated candidate | Presentation results | Decision |
+| --- | --- | --- |
+| Skip shader calculations outside the parent-clipped material | A1/B1/B2/A2 p95 86.60/84.18/84.32/82.38 ms | Reverted: screening gains were unconfirmed. A provider identity refreshed within A2, invalidating complete scene matching; its faster return-control result cannot establish a fully matched regression either. |
+| Always retain the filtered sharp/frost/veil composite | Matched control/candidate p95 86.79→81.88 ms, p99 123.25→148.47 ms | Reverted: all three candidate iterations worsened p99. Sampled full-screen layer draws increased 22→36. |
+| Retain that composite only when fully frosted | Matched p95 87.76→89.15 ms; overrun p95 56.97→65.65 ms | Reverted: slower presentation and overrun. A preceding both-endpoint variant passed seven rendering cases but was refined before timing; those captures are not attributed to the timed frost-only APK. |
+
+The accepted change removes unnecessary capture/output padding from the mapped optical stage.
+Its displacement field bends inward. If the minimum material extent is at least twice
+(maximum displacement + 2 pixels), even the maximum inward displacement cannot cross the
+opposite boundary. The original padding remains for tiny materials. The dock intermediate
+shrinks from 1844×274 to 1792×222 pixels (21.3% less area); actual RenderThread layer dimensions
+confirm that the smaller path runs on the TV. This adds no source snapshot or composite cache.
+The live source, shader, optical map, full-resolution sampling, image/cache bounds, focus,
+input rectangles, motion and opaque/unsupported fallbacks remain unchanged.
+
+### Final matched physical comparison
+
+Physical Smart TV Pro, API 34, existing 1920×1080 surface at approximately 60 Hz. Balanced,
+full motion, glass intensity 1, wallpaper-depth blur 1 and reduced transparency OFF are
+preserved. No default HOME, accessibility, power or display setting changes. The reference
+HOME remains available. Only this app is replacement-installed and explicitly started.
+
+Final production-source fingerprint:
+`e959b21180089902364442bebde537a12647efadd95a7855f71e97fcdf2fbc6a`.
+Optimized R8/resource-shrunk candidate APK:
+`8ada0e9e0d520cbe404f070efaefa4865c4f378f8d232846a10b8d60aaa05592`.
+JDK 21, pinned offline Gradle dependencies, Partial/Require compilation with three warmup
+and three measured iterations per block. Each rapid warm iteration primes a tour, settles,
+then injects 36 native vertical keys at absolute 180 ms cadence with a 700 ms tail.
+Processes restart in setup; OS, file, Coil and driver caches remain. There are no screenshots,
+memory queries or hierarchy inspections inside timed bursts.
+
+| Block | CPU-frame elapsed p95 (ms) | Overrun p95 (ms) | App-start-to-presentation p95 / p99 (ms) | App deadline misses / frames |
+| --- | --- | --- | --- | --- |
+| A1 | 54.41 | 82.73 | 107.21 / 124.49 | 89/1136 |
+| B1 | 39.77 | 52.59 | 81.91 / 116.37 | 69/1157 |
+| B2 | 38.23 | 50.52 | 81.89 / 116.24 | 65/1161 |
+| A2 | 39.64 | 56.95 | 86.62 / 122.59 | 68/1159 |
+
+Every measured iteration in all four blocks matches actual delivered keys, native focus
+walks and visible scene tags/text/bounds. All twelve complete traces pass loss/setup and
+frame/display-correlation checks. All iterations exercise mapped optics with zero shader
+fallback. Scene audits also check every iteration, rather than only the last scene of a block.
+
+A1 includes a slow first iteration: presentation p95 111.94 ms versus 85.57/85.41 ms for its
+other iterations; its full-screen layer count is 44 versus 22 in those other iterations.
+It is retained, not discarded. Use the return pair A2/B2 as the conservative headline:
+presentation p95 86.62→81.89 ms (4.73 ms, 5.5%); p99 122.59→116.24 ms (6.35 ms, 5.2%);
+CPU-frame p95 39.64→38.23 ms; overrun p95 56.95→50.52 ms. Candidate blocks reproduce
+81.91/81.89 ms presentation p95 and 116.37/116.24 ms p99. Median presentation remains
+approximately 65.2 ms, and deadline misses improve only slightly in the return pair
+(68/1159→65/1161). This is a tail-latency improvement, not a broad median speedup.
+
+Presentation uses actual app-frame start to the correlated SurfaceFlinger display-frame end;
+app completion includes GPU/buffer work. Macrobenchmark CPU-frame elapsed time includes
+pipeline waits. Frame quantiles are descriptive correlated samples, not independent trials,
+statistical significance, isolated GPU execution or remote-button-to-photon latency.
+The <1% missed-deadline and 60 Hz budgets remain unmet; no budget is relaxed.
+
+### Rendering and local validation
+
+The exact accepted-source Debug/test APKs pass all seven physical wallpaper, glass,
+reflection and moving/source-transition/resize/reattachment cases. Twenty comparable synthetic
+window-frame pairs differ from the preceding transparent control by at most one channel
+level, with no pixels differing by more than three. The initial frozen-clock capture differs
+because asynchronous map readiness is not synchronized; both sampled initial appearances
+retain their source, but that pair does not establish pixel equivalence. Settled optics and
+motion captures are visually inspected. The comparison does not establish universal fidelity.
+
+The bilinear sampling property test checks every pixel centre for representative dock,
+header, minimum-eligible, narrow and low-density material sizes at maximum displacement,
+plus tiny-material padding retention. Required Spotless, architecture, module tests, Debug
+lint, Debug/optimized/instrumentation/benchmark compilation and avatar checks pass.
+Configuration/wallpaper byte preservation, final installed APK and actual Home transparency
+are checked separately after timing. No startup, idle, long-duration memory or broad hardware
+acceptance is claimed by this experiment.
+
+Final replacement-install verification confirms the accepted APK hash and the unchanged
+production-source fingerprint. Configured DataStore and wallpaper files are byte-identical
+to the pre-investigation archive. Only ProfileInstaller/compilation bookkeeping files differ;
+a whole-files-directory equality check was initially too broad and its failure is retained in
+private evidence. Default HOME still matches the pre-repair value. The accepted optimized
+Home is explicitly started, captured and visually inspected with transparent dock and header
+controls. UI scene matching does not prove identical asynchronous artwork-decode completion
+at every instant; the scoped repeated frame results and initial-control outlier remain visible.
+
+
+## Follow-up: visible-wallpaper pass fusion (2026-10-24)
+
+Three isolated candidates target the visible full-screen wallpaper, independently of the
+accepted smaller mapped-glass bounds. The sharp/frost blend, black veil and vertical gradient
+can be expressed as one colour-managed RuntimeShader paint with two BitmapShader inputs.
+This reduces draw passes without changing the live split-glass source, image decode/cache
+limits, focus motion or quality settings. Original crossfades, translucent inputs, software
+rendering and unsupported API paths retain the existing layered renderer. One candidate
+retains the bounded full-screen cache; another samples both inputs without endpoint branches;
+a third draws the conditional paint directly using Auto compositing.
+
+This is an experiment in removing rendering work, not evidence that a native C/Rust library
+would improve this workload. Traces still contain substantial RenderThread drawing/flush work
+and pipeline waits. Their inclusive slice durations overlap; these traces contain no GPU
+hardware counters and cannot isolate shader execution, memory bandwidth or cache eviction.
+
+The same physical TV, configured transparency, source anchor, optimized build, Partial/Require
+compilation and rapid-warm protocol as the preceding experiment are used. Every block has
+three measured iterations after three compilation warmups. Native delivered keys, focus walks
+and all measured scene tags/text/bounds are checked. Raw traces, APKs, device identifiers,
+settings archives and captures remain ignored private evidence. A disconnected direct-path
+confirmation attempt is preserved separately and excluded; its runner failed in UiAutomation
+cleanup. A fresh output directory is used for the successful retry.
+
+Eight focused physical cases pass for each experimental source, including an additional
+nonvacuous fused-path test comparing both-dimensional opaque patterns at ten crop/depth
+combinations and replacement/resize. All 21 moving/source/resize/reattachment capture pairs
+for the final experimental variants differ from the accepted control by at most three channel
+levels, with no pixels exceeding that bound. Settled transparency is visually inspected.
+These rendering checks establish scoped fidelity, not performance acceptance. They do not
+justify keeping a candidate which fails the repeated timing criteria.
+
+
+| Variant / block | Presentation p95 / p99 (ms) | Overrun p95 (ms) | App deadline misses / frames |
+| --- | --- | --- | --- |
+| Conditional cached control A1 | 83.71 / 115.31 | 54.48 | 70/1156 |
+| Conditional cached B1 | 81.91 / 98.44 | 55.62 | 52/1173 |
+| Branchless cached control A1 | 103.91 / 118.89 | 80.56 | 85/1141 |
+| Branchless cached B1 | 84.16 / 101.70 | 56.54 | 53/1171 |
+| Branchless cached B2 | 95.63 / 105.17 | 68.46 | 81/1144 |
+| Branchless cached control A2 | 81.91 / 115.46 | 55.51 | 75/1153 |
+| Direct control A1 | 103.60 / 116.11 | 80.52 | 86/1139 |
+| Direct B1 | 82.27 / 93.58 | 51.26 | 73/1145 |
+| Direct B2, successful retry | 82.34 / 92.60 | 51.58 | 84/1142 |
+| Direct control A2 | 81.93 / 115.97 | 54.35 | 68/1158 |
+
+Conditional cached fusion fails the original frame-overrun nonregression screen and is
+reverted. The branchless cached candidate passes its initial screen, but its repeated
+improvement is unconfirmed: provider identities refresh between B1, B2 and A2. Each individual
+block has a uniform scene, but the final pair does not match completely. Its slower B2 and
+faster return control remain visible as descriptive results; they cannot establish a causal
+regression. No mixed-scene pooling or acceptance is allowed. Both branchless and direct A1
+controls contain a slow iteration, so their attractive initial tail gains are not sufficient.
+
+The direct candidate has a completely matched final pair and fails presentation-p95
+improvement (81.93→82.34 ms). Its typical app completion also worsens 39.97→44.92 ms and
+missed deadlines increase 68/1158→84/1142 despite its improved p99. It is reverted. Reducing
+texture operations or a full-screen cache does not by itself establish a faster complete
+frame. No experimental renderer is retained. The added fusion-only comparison fixture is
+also removed with that renderer; experimental sources and evidence remain private.
+
+The preceding verified smaller-bounds source/APK is restored, replacement-installed and
+explicitly started. Its production-source fingerprint and optimized APK hash exactly match
+the preceding accepted result. Required local gates pass again on this restored source;
+Spotless, architecture, all module tests, Debug lint and Debug/optimized/test/benchmark
+compilation pass. Avatar masters pass separately. Final settings/wallpaper byte comparison
+passes, with only ProfileInstaller bookkeeping differing. Default HOME is unchanged. A final
+physical Home capture is visually inspected: the dock and header controls remain transparent.
+No additional speedup or 60 fps acceptance is claimed from this follow-up. The existing
+<1% missed-deadline budget remains unmet. Presentation durations are correlated frame
+latencies, not inverse frame rates or button-to-photon measurements.

@@ -53,6 +53,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.Button
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -76,6 +79,8 @@ import kotlinx.coroutines.flow.first
 
 internal val HomeCardFocusSpec = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 260f)
 
+private class AppTileBounds(var value: Rect = Rect.Zero)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppTile(
@@ -92,7 +97,8 @@ fun AppTile(
     loadingVisible: Boolean = true,
     preparedArtworkSize: IntSize? = null,
 ) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
+    // Launch geometry is read only by input callbacks, not by composition.
+    val bounds = remember { AppTileBounds() }
     var focused by remember { mutableStateOf(false) }
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
@@ -145,12 +151,13 @@ fun AppTile(
                     }
                     .focusRequester(requester)
                     .onGloballyPositioned {
-                        bounds = it.boundsInWindow()
+                        val current = it.boundsInWindow()
+                        bounds.value = current
                         artworkVisible =
-                            bounds.left < artworkWindow.width &&
-                            bounds.right > 0 &&
-                            bounds.top < artworkWindow.height &&
-                            bounds.bottom > 0
+                            current.left < artworkWindow.width &&
+                            current.right > 0 &&
+                            current.top < artworkWindow.height &&
+                            current.bottom > 0
                     }
                     .onFocusChanged {
                         focused = it.isFocused
@@ -219,8 +226,8 @@ fun AppTile(
                         indication = null,
                         role = Role.Button,
                         onLongClickLabel = stringResource(R.string.edit_apps),
-                        onLongClick = onMenu?.let { { it(bounds) } },
-                        onClick = { onClick(bounds) },
+                        onLongClick = onMenu?.let { { it(bounds.value) } },
+                        onClick = { onClick(bounds.value) },
                     ),
             )
         }
@@ -244,6 +251,14 @@ private fun AppTileArtwork(
     val reflectionCache = LocalArtworkReflections.current
     var reflectionColors by remember(reflectionKey) { mutableStateOf(reflectionCache.colors(reflectionKey)) }
     var artworkPhase by remember(app.artworkCacheKey, artworkSize) { mutableStateOf(ArtworkPhase.WAITING) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(reflectionCache, reflectionKey, artworkPhase, lifecycle) {
+        if (artworkPhase == ArtworkPhase.READY) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                reflectionColors = reflectionCache.awaitColors(reflectionKey)
+            }
+        }
+    }
     FocusArtwork(
         focused,
         pressed,

@@ -29,6 +29,32 @@ import org.junit.Test
 class VisualExperienceTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun finalLiveStepIsReachableByRemoteAndAccessibilityAndOnlyAppliesExplicitly() {
+        val actions = mutableListOf<ExperienceAction>()
+        compose.setContent {
+            HazeTestTheme(LauncherPreferences()) {
+                VisualExperienceScreen(LauncherPreferences(), { actions.add(it) }, welcome = false)
+            }
+        }
+        compose.onNodeWithTag("experience-rail").assertIsFocused().performSemanticsAction(SemanticsActions.SetProgress) {
+            assertTrue(it(5f))
+        }
+        compose.runOnIdle { assertTrue(actions.isEmpty()) }
+        val range = compose.onNodeWithTag("experience-rail").fetchSemanticsNode().config[
+            androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+        ]
+        assertEquals(5f, range.current)
+        assertEquals(5f, range.range.endInclusive)
+        compose.onNodeWithTag("experience-rail").performKeyInput {
+            pressKey(Key.DirectionLeft)
+            pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionCenter)
+        }
+        compose.onNodeWithTag("experience-apply").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertTrue((actions.single() as ExperienceAction.Apply).value.liveGlass) }
+    }
+
     @Test fun previewSurvivesRecreationAndOnlyExplicitApplySubmits() {
         val actions = mutableListOf<ExperienceAction>()
         val restoration = StateRestorationTester(compose)

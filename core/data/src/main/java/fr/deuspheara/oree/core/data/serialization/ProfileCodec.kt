@@ -63,6 +63,7 @@ fun encodeProfiles(snapshot: ProfileSnapshot): String {
                         }
                     },
                 )
+                .put("liveGlass", v.liveGlass)
                 .put("liquidGlass", v.liquidGlass)
                 .put("glassIntensity", v.glassIntensity)
                 .put("backdropBlur", v.backdropBlur)
@@ -162,6 +163,7 @@ fun decodeProfiles(raw: String): ProfileSnapshot {
                         v.getBoolean("sideloaded"),
                         v.getBoolean("context"),
                         CatalogSort.valueOf(v.getString("sort")),
+                        liveGlass = v.optBoolean("liveGlass", false),
                         liquidGlass = v.optBoolean("liquidGlass", true),
                         glassIntensity = v.optDouble("glassIntensity", .75).toFloat(),
                         backdropBlur = v.optDouble("backdropBlur", 1.0).toFloat(),

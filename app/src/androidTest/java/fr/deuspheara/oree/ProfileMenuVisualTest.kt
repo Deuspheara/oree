@@ -116,6 +116,7 @@ class ProfileMenuVisualTest {
         val variants =
             listOf(
                 "dark" to LauncherPreferences(),
+                "live" to LauncherPreferences(liveGlass = true),
                 "light" to LauncherPreferences(theme = ThemeMode.LIGHT),
                 "glass-off" to LauncherPreferences(liquidGlass = false),
                 "opaque" to LauncherPreferences(reduceTransparency = true),

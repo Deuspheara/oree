@@ -319,4 +319,6 @@
     <string name="experience_full_body">Verre et arrière-plan les plus riches. Sollicite davantage les ressources graphiques.</string>
     <string name="experience_sample_apps">Applis</string>
     <string name="experience_sample_glass">Verre</string>
+    <string name="experience_live_glass">Verre liquide en direct</string>
+    <string name="experience_live_glass_body">Réfraction Haze en direct et animations complètes, même lors du défilement rapide. Charge graphique maximale ; peut réduire la fluidité.</string>
 </resources>

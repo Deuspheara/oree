@@ -47,6 +47,7 @@ data class LauncherPreferences(
     val backdropBlur: Float = 1f,
     val motionIntensity: Float = 1f,
     val setupComplete: Boolean = false,
+    val liveGlass: Boolean = false,
 ) {
     fun normalized(): LauncherPreferences = copy(
         motionIntensity = if (motionIntensity.isFinite()) motionIntensity.coerceIn(0f, 1f) else 1f,

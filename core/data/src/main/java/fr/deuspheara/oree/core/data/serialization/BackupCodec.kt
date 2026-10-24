@@ -117,7 +117,7 @@ private fun validateImportedValues(data: JSONObject) {
             throw IOException("Invalid favorites")
         }
         val settings = profile.getJSONObject("settings")
-        listOf("motion", "transparency", "contrast", "sideloaded", "context", "liquidGlass", "setupComplete")
+        listOf("motion", "transparency", "contrast", "sideloaded", "context", "liquidGlass", "setupComplete", "liveGlass")
             .forEach { key ->
                 if (settings.has(key) && settings.get(key) !is Boolean) {
                     throw IOException("Invalid appearance preference")

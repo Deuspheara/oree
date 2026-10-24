@@ -35,6 +35,7 @@ fun HazeTestTheme(preferences: LauncherPreferences, content: @Composable () -> U
             LocalGlassSource provides source,
             LocalLiquidGlass provides preferences.liquidGlass,
             LocalGlassIntensity provides preferences.glassIntensity,
+            fr.deuspheara.oree.core.designsystem.glass.LocalLiveGlass provides preferences.liveGlass,
             LocalReducedTransparency provides
                 (
                     preferences.reduceTransparency ||

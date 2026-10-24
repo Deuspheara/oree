@@ -368,3 +368,7 @@ Card rendering retains static pixels at the full enlarged focus resolution while
 reflection and focus transforms live. This avoids repeatedly issuing the static image,
 rounded shape, edge and shade operations during movement. Input bounds and image request
 quality remain unchanged; oversized cache requests use the original live drawing path.
+
+## Live glass and profiles
+
+The profile switcher and editor share a source-backed panel with consistent padding. Selection remains distinct from focus. Settings rows retain their selected fill and semantics without the left accent stripe. The final Visual experience step selects live Haze optics; other presets retain the existing bounded renderer.

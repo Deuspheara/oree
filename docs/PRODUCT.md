@@ -22,7 +22,7 @@ Features and UI are still evolving. Public release requires device/accessibility
 ## Visual setup and direct Settings navigation
 
 New local profiles begin with a welcome screen. Users can keep the current appearance or
-preview five relative visual workloads, from Simple to Full, using a stepped remote slider.
+preview six relative visual workloads, from Simple to Live Liquid Glass, using a stepped remote slider.
 Only Finish saves the draft; setup remains visible while that profile's accepted write is
 pending or failed. Existing stored profiles skip welcome and retain their appearance.
 Appearance → Visual experience reopens the preview later.
@@ -31,3 +31,5 @@ Settings shows one column at a time. Select opens a category or choice; Back ret
 level and restores the previous logical focus and viewport. Folder hover keeps its icon
 preview without an instructional sentence. Continue Watching uses the screen-wide viewport,
 with its initial card aligned to the heading's inset.
+
+The visual experience rail also offers a sixth, final **Live Liquid Glass** step. It is an explicit opt-in to live Haze optics and uninterrupted focus effects during rapid navigation, with higher GPU cost. Existing profiles retain their previous renderer until selected.

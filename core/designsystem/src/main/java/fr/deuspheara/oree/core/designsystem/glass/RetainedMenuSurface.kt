@@ -55,6 +55,18 @@ fun RetainedMenuSurface(
     performanceMode: dev.chrisbanes.haze.HazePerformanceMode =
         dev.chrisbanes.haze.HazePerformanceMode.Balanced,
 ) {
+    if (LocalLiveGlass.current) {
+        Box(
+            modifier.glassSurface(
+                radius = radius,
+                treatment = treatment,
+                role = role,
+                progressive = progressive,
+                performanceMode = performanceMode,
+            ),
+        )
+        return
+    }
     val source = LocalGlassSource.current
     var position by remember { mutableStateOf(Offset.Unspecified) }
     var size by remember { mutableStateOf(IntSize.Zero) }

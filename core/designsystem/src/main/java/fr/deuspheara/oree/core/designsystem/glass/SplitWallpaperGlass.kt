@@ -103,7 +103,11 @@ internal fun SplitWallpaperGlassSources(
                     }.hazeGlass(HazeInput.Content, filter, HazePerformanceMode.Balanced),
                 ) { WallpaperGlassComponent(frost) }
                 Box(
-                    Modifier.fillMaxSize().graphicsLayer { alpha = diffusion() }
+                    // Keep this layer to one rectangle so per-draw alpha matches group alpha.
+                    Modifier.fillMaxSize().graphicsLayer {
+                        alpha = diffusion()
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    }
                         .background(Color.Black.copy(alpha = .25f)),
                 )
             }

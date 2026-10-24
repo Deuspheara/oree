@@ -121,3 +121,31 @@ controls; their refraction and lighting retain the current control geometry. Sou
 opacity, sampling policy and the wallpaper transition govern eligibility. The original input
 remains selected during wallpaper crossfades and for other materials. Haze/Compose own the
 graphics layers and their disposal; no pixels enter ViewModels, saved state or a disk cache.
+
+Eligible clear controls can replace Haze's optical stage through its public custom-effect API.
+Composition owns a cancellable, geometry-keyed optical-map bake on Default; each effect node
+owns its shader and bounded input layer. The bounded nine-patch map contains displacement and
+fixed rim lighting, while Haze keeps live source positioning/invalidation. Pending, unsupported
+or failed optical maps retain the ordinary Haze path; all bitmap state stays in presentation.
+
+The optical map displaces samples inward. Materials whose minimum extent is at least twice
+(maximum displacement + 2 pixels) use their exact drawing bounds for input/output, rather than
+an unnecessary outside sampling border. Smaller materials retain the original padded path.
+The bilinear map-sampling property test checks this invariant at maximum intensity; lower
+intensities interpolate toward the already in-bounds original position. The map, live source,
+optical shader, sampling resolution and original allocation eligibility guard remain unchanged.
+
+The experimental immutable-field/direct-sampling path was withdrawn after a physical-TV
+regression: wallpaper-backed dock/header controls rendered black in transparent mode. The
+production path keeps Haze-owned live input and the existing split filters; it does not freeze
+those hidden source trees into snapshots. The optical shader retains a conservative neutral
+interior bypass, accounting for rounded corners and filtering support. Single-bitmap visible
+frost applies opacity directly to its draw; multi-draw filtered sources retain group compositing.
+
+Artwork delivery is independent of optional reflection metadata. The platform palette retains
+its 64-entry metadata cache and serial scratch ownership, with at most eight queued/running
+decoded-image references. Generation-tagged completion cannot repopulate a cleared cache.
+Home observes optional completion through an Android-free suspending palette method while
+STARTED; cancellation of an observation does not cancel another card's shared preparation.
+
+`LauncherPreferences.liveGlass` is an optional profile/backup Boolean, defaulting to false for legacy data. The existing schema and IDs are preserved. The final visual preset enables it; lower presets disable it. App provides a presentation local consumed by glass and focus drawing; ViewModels remain independent of rendering APIs. Live mode bypasses precomputed optics, prepared sharp/frost inputs and retained menu images, while preserving opaque/accessibility fallbacks.

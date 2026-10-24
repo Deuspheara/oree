@@ -46,6 +46,11 @@ internal fun HomeContinuationRow(
     viewportWidth: Dp? = null,
     onEnterFromBelow: (() -> Boolean)? = null,
 ) {
+    val appsByPackage = remember(apps) {
+        buildMap {
+            for (app in apps) if (app.packageName !in this) put(app.packageName, app)
+        }
+    }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(if (large) 4.dp else 8.dp)) {
         Text(
             heading,
@@ -79,10 +84,12 @@ internal fun HomeContinuationRow(
                     val requester = remember(entry.id) { FocusRequester() }
                     DisposableEffect(entry.id) {
                         focus.contentRequesters[entry.id] = requester
-                        onDispose { focus.contentRequesters.remove(entry.id) }
+                        onDispose {
+                            if (focus.contentRequesters[entry.id] === requester) focus.contentRequesters.remove(entry.id)
+                        }
                     }
                     ContentCard(
-                        entry, apps.firstOrNull { it.packageName == entry.source }, reduced,
+                        entry, appsByPackage[entry.source], reduced,
                         Modifier.width(cardWidth).focusRequester(requester).focusProperties {
                             start = if (index == 0) FocusRequester.Cancel else FocusRequester.Default
                             end = if (index == entries.lastIndex) FocusRequester.Cancel else FocusRequester.Default

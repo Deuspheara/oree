@@ -1,10 +1,23 @@
 # Oree
 
-A local Android TV launcher built with Kotlin and Compose for TV. This is an early development project; features and UI are still evolving.
+A local, remote-first Android TV and Google TV launcher, built with Kotlin and Compose for TV.
 
-Oree includes an installed-app catalog, favorites, folders, local search, profiles, wallpapers, settings and remote-friendly controls. Optional features include local photos, public TV content providers, ambient display, an Android screensaver and configuration backup/restore. Streaming apps continue to own playback and their accounts.
+![Oree Home with sample apps](docs/screenshots/home.png)
 
-The app has no Internet permission, advertising, telemetry or required account. UI strings are available in English and French.
+Browse apps, organize favorites and folders, and switch between local profiles. Oree combines a glass dock, animated focus, local search, wallpapers and controls designed for a D-pad. English and French are included.
+
+- **Your layout:** favorites, folders, app organization and independent profile appearances.
+- **Your visual workload:** six previewable steps, from static Simple to Live Liquid Glass. The final step uses live Haze refraction and retains full focus animation during rapid navigation; it costs more GPU time. Reduced motion and contrast preferences take precedence. Open **Settings → Appearance → Visual experience**.
+- **Local by default:** no Internet permission, ads, telemetry or required account. Optional Android TV content providers supply their own available content; streaming apps own playback and their accounts.
+- **Optional extras:** accessible local photos, ambient display, an Android screensaver and validated configuration export/import with undo. Image files are referenced rather than embedded in backups.
+
+This is an early development project with no published release. Minimum API support is a build target; physical device coverage and performance acceptance remain limited. See [compatibility](docs/ANDROID_COMPATIBILITY.md) and [performance](docs/PERFORMANCE.md).
+
+| Profiles | Visual experience |
+| --- | --- |
+| ![Profile switcher](docs/screenshots/profiles.png) | ![Live Liquid Glass option](docs/screenshots/live-glass.png) |
+
+These are physical-TV captures of the actual UI with in-memory sample data and project-owned artwork, rather than a personal catalog. See [capture details](docs/screenshots/README.md).
 
 ## Build
 
@@ -53,6 +66,10 @@ python3 scripts/export-avatars.py --check
 ```
 
 Formatting uses Spotless/ktlint. Android Lint and module-boundary checks are mandatory. Device tests, accessibility checks and physical performance measurements are separate requirements; build success does not establish release readiness. See [Testing](docs/TEST_PLAN.md) and [Performance](docs/PERFORMANCE.md).
+
+## Public source preparation
+
+See [publication notes](docs/PUBLICATION.md) for reviewing Git history, keeping local evidence private, and preparing a source archive.
 
 ## License
 

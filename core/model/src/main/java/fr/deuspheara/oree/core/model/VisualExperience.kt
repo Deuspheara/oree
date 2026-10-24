@@ -7,6 +7,7 @@ enum class VisualExperience(val motion: Float, val glass: Float, val blur: Float
     BALANCED(.75f, .45f, .5f),
     RICH(1f, .75f, .8f),
     FULL(1f, 1f, 1f),
+    LIVE_GLASS(1f, 1f, 1f),
     ;
 
     fun applyTo(value: LauncherPreferences): LauncherPreferences = value.copy(
@@ -17,12 +18,14 @@ enum class VisualExperience(val motion: Float, val glass: Float, val blur: Float
         glassIntensity = glass.coerceAtLeast(.25f),
         backdropBlur = blur,
         motionIntensity = motion,
+        liveGlass = this == LIVE_GLASS,
     )
 
     companion object {
         fun nearest(value: LauncherPreferences): VisualExperience = when {
             value.quality == QualityTier.ECONOMY || value.reduceMotion -> SIMPLE
             !value.liquidGlass || value.reduceTransparency -> LIGHT
+            value.liveGlass -> LIVE_GLASS
             value.glassIntensity < .6f -> BALANCED
             value.glassIntensity < .9f -> RICH
             else -> FULL

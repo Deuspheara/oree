@@ -18,7 +18,13 @@ class ProfileExperienceCodecTest {
     private val snapshot =
         ProfileSnapshot(
             "fixture",
-            listOf(LocalProfile("fixture", "Sample", preferences = LauncherPreferences(motionIntensity = .55f, setupComplete = false))),
+            listOf(
+                LocalProfile(
+                    "fixture",
+                    "Sample",
+                    preferences = LauncherPreferences(motionIntensity = .55f, setupComplete = false, liveGlass = true),
+                ),
+            ),
         )
 
     @Test fun newSetupAndMotionRoundTripWithStableProfileIdentity() {
@@ -31,14 +37,16 @@ class ProfileExperienceCodecTest {
         val settings = json.getJSONArray("profiles").getJSONObject(0).getJSONObject("settings")
         settings.remove("motionIntensity")
         settings.remove("setupComplete")
+        settings.remove("liveGlass")
         val value = decodeProfiles(json.toString()).active!!
         assertTrue(value.preferences.setupComplete)
+        assertEquals(false, value.preferences.liveGlass)
         assertEquals(1f, value.preferences.motionIntensity)
         assertEquals(snapshot.activeId, value.id)
     }
 
     @Test fun importedExperienceFieldsAreValidated() {
-        for ((key, value) in listOf("motionIntensity" to 2, "setupComplete" to "yes")) {
+        for ((key, value) in listOf("motionIntensity" to 2, "setupComplete" to "yes", "liveGlass" to "yes")) {
             val json = JSONObject(encodeBackup(snapshot))
             json.getJSONObject("profiles").getJSONArray("profiles").getJSONObject(0).getJSONObject("settings").put(key, value)
             try {

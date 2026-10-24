@@ -143,6 +143,7 @@ fun GlassIntensityPreview(preferences: LauncherPreferences, previewFocus: Int? =
         LocalGlassSource provides source,
         LocalLiquidGlass provides preferences.liquidGlass,
         LocalGlassIntensity provides preferences.glassIntensity,
+        fr.deuspheara.oree.core.designsystem.glass.LocalLiveGlass provides preferences.liveGlass,
         LocalReducedTransparency provides opaque,
     ) {
         Box(

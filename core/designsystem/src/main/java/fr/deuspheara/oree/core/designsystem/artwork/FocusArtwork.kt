@@ -61,7 +61,7 @@ fun FocusArtwork(
     // Keep composition-local reads outside focus-dependent branches so the remembered
     // animation state retains its slot when focus enters or leaves the card.
     val motionIntensity = LocalMotionIntensity.current
-    val fastNavigation = LocalFastNavigation.current
+    val fastNavigation = LocalFastNavigation.current && !fr.deuspheara.oree.core.designsystem.glass.LocalLiveGlass.current
     val highContrast = LocalHighContrast.current
     val motionReduced = reduced || fastNavigation || motionIntensity == 0f
     val ring = focused && (motionReduced || highContrast)

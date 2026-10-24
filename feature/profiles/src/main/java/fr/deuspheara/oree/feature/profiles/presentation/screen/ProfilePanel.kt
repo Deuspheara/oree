@@ -78,7 +78,6 @@ import fr.deuspheara.oree.core.designsystem.artwork.FocusArtwork
 import fr.deuspheara.oree.core.designsystem.avatar.ProfileAvatar
 import fr.deuspheara.oree.core.designsystem.component.SettingsRow
 import fr.deuspheara.oree.core.designsystem.component.panelMotion
-import fr.deuspheara.oree.core.designsystem.component.panelSurface
 import fr.deuspheara.oree.core.designsystem.component.rememberPanelTransition
 import fr.deuspheara.oree.core.designsystem.glass.GlassDialog
 import fr.deuspheara.oree.core.designsystem.glass.GlassSurfaceRole
@@ -174,18 +173,14 @@ fun ProfilePanel(
                         .panelMotion(motion, reduced, 32f)
                         .testTag("profile-panel"),
                 ) {
-                    if (editing) {
-                        CompositionLocalProvider(
-                            LocalOpaquePanels provides (opaque || LocalOpaquePanels.current),
-                        ) {
-                            RetainedMenuSurface(sourceKey, reduced, Modifier.matchParentSize())
-                        }
-                    } else if (opaque) {
-                        Box(Modifier.matchParentSize().panelSurface(true))
+                    CompositionLocalProvider(
+                        LocalOpaquePanels provides (opaque || LocalOpaquePanels.current),
+                    ) {
+                        RetainedMenuSurface(sourceKey, reduced, Modifier.matchParentSize())
                     }
                     Column(
                         Modifier.verticalScroll(rememberScrollState())
-                            .padding(if (editing || opaque) 24.dp else 0.dp),
+                            .padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         if (editing) {
