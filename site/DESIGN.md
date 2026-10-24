@@ -4,6 +4,8 @@
 >
 > **Status:** Applied to the website revision. Preserve working functionality and existing assets unless a change is justified.
 
+The “Detail without distraction” visual-quality section and its interactive CSS comparison have been removed from the website. The sections below describing that comparison are historical design context, not current acceptance requirements.
+
 ## 1. Creative direction
 
 ### The product is the experience

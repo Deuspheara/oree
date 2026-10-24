@@ -1,6 +1,6 @@
 # Website and GitHub Pages
 
-The product website lives in `site/`. It uses plain HTML, CSS and JavaScript, with project-owned artwork and sample screenshots. It has no package-manager dependencies, analytics, external fonts or required account.
+The product website lives in `site/`. It uses plain HTML and CSS, with project-owned artwork and sample screenshots. It has no package-manager dependencies, analytics, external fonts or required account.
 
 The [website design brief](../site/DESIGN.md) defines the visual system and acceptance criteria. It is separate from the Android app's design rules.
 
@@ -11,13 +11,12 @@ From the repository folder:
 ```sh
 python3 scripts/build-site.py
 python3 scripts/check-site.py
-node --check site/app.js
 python3 -m http.server 8765 --directory .site-build
 ```
 
 Open `http://localhost:8765`. Stop the server with Ctrl+C.
 
-The glass comparison is an illustration, not the Android renderer or a benchmark. Its six presets are checked against `VisualExperience.kt` during the build. Reduced-motion preferences are respected.
+The website presents Home and local profiles using curated app screenshots. The visual-quality comparison section has been removed.
 
 ## Activate GitHub Pages
 
