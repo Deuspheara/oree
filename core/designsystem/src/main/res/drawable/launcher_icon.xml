@@ -1,1 +1,11 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64"><path android:fillColor="#192631" android:pathData="M0,0h64v64h-64z"/><path android:fillColor="#E7F1F7" android:pathData="M12,17h40v27h-40z"/><path android:fillColor="#192631" android:pathData="M16,21h32v19h-32z"/><path android:fillColor="#E7F1F7" android:pathData="M24,48h16v3h-16z"/></vector>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp" android:height="80dp"
+    android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="@color/oree_brand_icon_background" android:pathData="M0,0h64v64h-64z" />
+    <group android:pivotX="32" android:pivotY="32" android:rotation="-30">
+        <path android:fillColor="@android:color/transparent" android:strokeColor="@color/oree_brand_icon_foreground"
+            android:strokeWidth="2" android:pathData="M13,32a19,19 0,1 0,38 0a19,19 0,1 0,-38 0" />
+        <path android:fillColor="@android:color/transparent" android:strokeColor="@color/oree_brand_icon_foreground"
+            android:strokeWidth="2" android:pathData="M24,32a8,19 0,1 0,16 0a8,19 0,1 0,-16 0" />
+    </group>
+</vector>

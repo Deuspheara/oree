@@ -41,3 +41,7 @@ Maintain English and French UI strings. Check large text, RTL, high contrast, re
 Show loading, empty, cached failure, denied and unsupported states honestly. Use bounded image requests and static fallbacks. Only the focused visible loading app may show its one-pass feedback; stop it on success, failure, blur, lifecycle stop or reduced motion. Do not add permanent idle animation.
 
 For implementation rules, see [Architecture](ARCHITECTURE.md), [Motion](MOTION.md) and [Testing](TEST_PLAN.md). Historical visual studies remain in Git history; they do not define exact platform dimensions or timings.
+
+## App identity
+
+The TV banner uses the lowercase `oree.` wordmark; the square app icon uses the website orbit mark. Keep separate adaptive foreground/background layers and an Android 13+ monochrome layer. See [brand assets](../assets/branding/README.md) for geometry, colors and source artwork.

@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:rotation="-30">
+        <path android:fillColor="@android:color/transparent" android:strokeColor="@color/oree_brand_icon_foreground"
+            android:strokeWidth="2.7" android:pathData="M28.35,54a25.65,25.65 0,1 0,51.3 0a25.65,25.65 0,1 0,-51.3 0" />
+        <path android:fillColor="@android:color/transparent" android:strokeColor="@color/oree_brand_icon_foreground"
+            android:strokeWidth="2.7" android:pathData="M43.2,54a10.8,25.65 0,1 0,21.6 0a10.8,25.65 0,1 0,-21.6 0" />
+    </group>
+</vector>
