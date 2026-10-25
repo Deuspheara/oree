@@ -1,6 +1,6 @@
 # Website and GitHub Pages
 
-The product website lives in `site/`. It uses plain HTML and CSS, with project-owned artwork and sample screenshots. It has no package-manager dependencies, analytics, external fonts or required account.
+The product website lives in `site/`. It uses HTML, CSS and an optional local WebGL cloud shader, with project-owned artwork and sample screenshots. It has no package-manager dependencies, analytics, external fonts or required account.
 
 The [website design brief](../site/DESIGN.md) defines the visual system and acceptance criteria. It is separate from the Android app's design rules.
 
@@ -16,7 +16,7 @@ python3 -m http.server 8765 --directory .site-build
 
 Open `http://localhost:8765`. Stop the server with Ctrl+C.
 
-The website presents Home and local profiles using curated app screenshots. The visual-quality comparison section has been removed.
+The website presents Home and local profiles using curated app screenshots, with a procedural cloud introduction, remote-navigation explanations, privacy details and native FAQ disclosures. The decorative sky enhancement pauses offscreen and when the page is hidden, and renders a still frame for reduced motion. CSS provides a fallback without JavaScript or WebGL. A separate small script lights the decorative footer wordmark under a fine pointer; it stays static with reduced motion. Header controls use simple CSS frost with fixed hover geometry. The visual-quality comparison section remains removed.
 
 ## Activate GitHub Pages
 

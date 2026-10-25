@@ -45,9 +45,12 @@ def main():
         elif url.fragment:
             assert url.fragment in document.ids, f"Missing anchor: {target}"
     for asset in re.findall(r'url\(["\']?([^\)"\']+)', (ROOT / "styles.css").read_text()):
-        assert not urlsplit(asset).scheme and (ROOT / asset).is_file(), f"Missing CSS asset: {asset}"
+        if asset.startswith("#"):
+            assert asset[1:] in document.ids, f"Missing CSS reference: {asset}"
+        else:
+            assert not urlsplit(asset).scheme and (ROOT / asset).is_file(), f"Missing CSS asset: {asset}"
     assert {"main", "get-started"} <= document.ids
-    expected = {"index.html", "styles.css", "favicon.svg", ".nojekyll", "assets/home.png", "assets/profiles.png"}
+    expected = {"index.html", "styles.css", "favicon.svg", ".nojekyll", "assets/home.png", "assets/profiles.png", "interactions.js", "sky.js"}
     assert {str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file()} == expected, "Unexpected public artifact file"
     assert "prefers-reduced-motion" in (ROOT / "styles.css").read_text()
     print("PASS: public allowlist, project-relative links, image labels and reduced-motion path")

@@ -58,4 +58,4 @@ after target setup and retains its separately archived configuration.
 
 ## Product website
 
-`build-site.py` generates the dependency-free GitHub Pages site from an explicit public-file allowlist. `check-site.py` checks links, exported files, image labels and the six source-backed preset controls. See [website setup](../docs/WEBSITE.md) for local preview and deployment.
+`build-site.py` generates the dependency-free GitHub Pages site from an explicit public-file allowlist. `check-site.py` checks links, exported files, image labels and reduced-motion support. See [website setup](../docs/WEBSITE.md) for local preview and deployment.

@@ -6,6 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / ".site-build"
 ASSETS = {
+    "site/sky.js": "sky.js",
+    "site/interactions.js": "interactions.js",
     "docs/screenshots/home.png": "assets/home.png",
     "docs/screenshots/profiles.png": "assets/profiles.png",
     "site/styles.css": "styles.css",
