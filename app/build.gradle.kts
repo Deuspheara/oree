@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.baselineprofile)
+}
+val localSigningEnabled = providers.gradleProperty("oree.localSigning").map(String::toBoolean).getOrElse(false)
+val localSigningProperties = Properties().apply {
+    if (localSigningEnabled) {
+        val propertiesFile = rootProject.file(".signing/release.properties")
+        require(propertiesFile.isFile) { "Run python3 scripts/setup-release-signing.py first" }
+        propertiesFile.inputStream().use(::load)
+    }
 }
 android {
     namespace = "fr.deuspheara.oree"
@@ -19,11 +29,22 @@ android {
         compose = true
         buildConfig = true
     }
+    signingConfigs {
+        if (localSigningEnabled) {
+            create("localRelease") {
+                storeFile = rootProject.file(".signing/oree-release.p12")
+                storePassword = requireNotNull(localSigningProperties.getProperty("storePassword"))
+                keyAlias = requireNotNull(localSigningProperties.getProperty("keyAlias"))
+                keyPassword = requireNotNull(localSigningProperties.getProperty("keyPassword"))
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (localSigningEnabled) signingConfig = signingConfigs.getByName("localRelease")
         }
     }
     compileOptions {

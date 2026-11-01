@@ -1,5 +1,5 @@
 <resources>
-<string name="app_name">TV Launcher</string>
+<string name="app_name">oree</string>
 <string name="home">Accueil</string>
 <string name="apps">Vos applications</string>
 <string name="eyebrow">Un espace pour votre quotidien.</string>
@@ -226,7 +226,7 @@
     <string name="ambient_exit">Quitter la vue d’ambiance</string>
     <string name="ambient_photo_fallback">Photos indisponibles · Fond d’écran conservé</string>
     <string name="ambient_system_settings">Réglages de l’économiseur Android</string>
-    <string name="ambient_service">Fond d’écran TV Launcher</string>
+    <string name="ambient_service">Fond d’écran oree</string>
     <string name="ambient_help">La vue d’ambiance s’ouvre manuellement et respecte la veille Android. Les photos autorisées changent toutes les 30 secondes. L’économiseur sélectionné séparément dans Android utilise votre fond local. Ce lanceur ne sélectionne ni n’active un économiseur système.</string>
     <string name="search_photo">Photo locale</string>
     <string name="preview_available">Des contenus publiés par les applications sont accessibles.</string>

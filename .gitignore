@@ -25,6 +25,7 @@ __pycache__/
 .venv/
 
 # Local credentials and signing material
+.signing/
 .env
 .env.*
 !.env.example

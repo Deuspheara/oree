@@ -1,5 +1,5 @@
 <resources>
-<string name="app_name">TV Launcher</string>
+<string name="app_name">oree</string>
 <string name="home">Home</string>
 <string name="apps">Your applications</string>
 <string name="eyebrow">A little space for your everyday.</string>
@@ -226,7 +226,7 @@
     <string name="ambient_exit">Exit ambient view</string>
     <string name="ambient_photo_fallback">Photos unavailable · Wallpaper retained</string>
     <string name="ambient_system_settings">Android screensaver settings</string>
-    <string name="ambient_service">TV Launcher wallpaper</string>
+    <string name="ambient_service">oree wallpaper</string>
     <string name="ambient_help">Ambient view opens manually and follows Android standby. Local photos change every 30 seconds when permitted. Android’s separately selected screensaver uses your local wallpaper. This launcher does not select or activate a system screensaver.</string>
     <string name="search_photo">Local photo</string>
     <string name="preview_available">Accessible app-published content is available.</string>

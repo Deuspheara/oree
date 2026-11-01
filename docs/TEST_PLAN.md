@@ -8,12 +8,21 @@ Use JDK 21 and the pinned Gradle wrapper:
 
 ```sh
 ./gradlew spotlessCheck verifyArchitecture test lintDebug \
-  :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleBenchmarkRelease
+  :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:assembleBenchmarkRelease
 ./gradlew :app:assembleDebugAndroidTest :benchmark:assembleNonMinifiedRelease
+./gradlew :app:analyzeReleaseR8Config
 python3 scripts/export-avatars.py --check
 ```
 
 These check formatting, architecture, module/DI tests, Android lint, optimized compilation and test/benchmark compilation. Build success does not establish physical focus, accessibility or performance acceptance.
+
+CI builds the unsigned, optimized release and retains its R8 reports and mapping as workflow artifacts. Review the analyzer output for restrictive dependency rules before changing keep rules. The checked-in baseline profile is included in release builds; refresh it only with the documented safe device procedure, not during CI builds.
+
+For a new signing identity, run `python3 scripts/setup-release-signing.py` once. It creates an ignored `.signing/` directory containing a PKCS12 keystore and a randomly generated password in `release.properties`, with owner-only filesystem permissions. It refuses to overwrite the directory. If the app has an existing release key, preserve and use that key instead: changing the signing identity prevents normal updates. These files contain sensitive credentials in plaintext on disk; keep the disk encrypted, restrict access and make an encrypted offline backup of both files. Do not share or commit them.
+
+To sign an optimized local APK with this key, use `./gradlew -Poree.localSigning=true :app:assembleRelease`. Without the explicit property, the release remains unsigned, including on CI. The local key is not a debug signing key. Configure GitHub's four release secrets using the same keystore, alias and passwords to make GitHub releases update-compatible with local releases.
+
+To prepare a GitHub draft prerelease, first create and push an authorized `v`-prefixed tag, then run Android CI manually with that tag selected. After verification succeeds, CI signs the optimized APK and creates a draft prerelease with its SHA-256 checksum. Configure repository secrets `RELEASE_KEYSTORE_BASE64` (base64 of the keystore), `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, and `RELEASE_KEY_PASSWORD` before running it. Keep the signing key backed up securely and use the same key for updates. The maintainer must review device evidence, release contents and signing identity before publishing the draft; a successful build alone is not release acceptance.
 
 ## Run device tests safely
 
